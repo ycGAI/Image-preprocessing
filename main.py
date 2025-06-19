@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-图像清晰度分类主程序
-
-使用方法:
-    python main.py --source /path/to/source --output /path/to/output
-    python main.py --config config.json
-    python main.py --preview --source /path/to/source
-"""
-
 import argparse
 import json
 import sys
@@ -22,12 +13,6 @@ from file_utils import FileUtils
 
 
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
-    """设置日志配置
-    
-    Args:
-        log_level: 日志级别
-        log_file: 日志文件路径
-    """
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     
     handlers = [logging.StreamHandler(sys.stdout)]
@@ -42,29 +27,17 @@ def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
 
 
 def load_config(config_path: str) -> Dict:
-    """加载配置文件
-    
-    Args:
-        config_path: 配置文件路径
-        
-    Returns:
-        配置字典
-    """
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         return config
     except Exception as e:
-        logging.error(f"加载配置文件失败: {e}")
+        logging.error(f"loading fail: {e}")
         return {}
 
 
 def create_default_config() -> Dict:
-    """创建默认配置
-    
-    Returns:
-        默认配置字典
-    """
+
     return {
         "source_root": "./input",
         "output_root": "./output",
@@ -92,27 +65,21 @@ def create_default_config() -> Dict:
 
 
 def save_config_template(output_path: str):
-    """保存配置文件模板
-    
-    Args:
-        output_path: 输出路径
-    """
     config = create_default_config()
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-        print(f"配置文件模板已保存到: {output_path}")
+        print(f"config file saved {output_path}")
     except Exception as e:
-        print(f"保存配置文件模板失败: {e}")
+        print(f"fail save {e}")
 
 
 def main():
-    """主函数"""
     parser = argparse.ArgumentParser(
-        description="图像清晰度分类工具",
+        description="image sharpness classification tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-使用示例:
+example usage:
   python main.py --source ./images --output ./results
   python main.py --config config.json
   python main.py --preview --source ./images --max-folders 3
@@ -120,36 +87,33 @@ def main():
         """
     )
     
-    parser.add_argument('--source', '-s', type=str, help='源文件夹路径')
-    parser.add_argument('--output', '-o', type=str, help='输出文件夹路径')
-    parser.add_argument('--config', '-c', type=str, help='配置文件路径')
-    parser.add_argument('--preview', action='store_true', help='预览模式（只分析不处理）')
-    parser.add_argument('--max-folders', type=int, default=3, help='预览模式下最大文件夹数')
-    parser.add_argument('--max-workers', type=int, help='最大线程数')
+    parser.add_argument('--source', '-s', type=str, help='source folder path')
+    parser.add_argument('--output', '-o', type=str, help='output folder path')
+    parser.add_argument('--config', '-c', type=str, help='config file path')
+    parser.add_argument('--preview', action='store_true', help='preview mode (analyze only, do not process)')
+    parser.add_argument('--max-folders', type=int, default=3, help='maximum number of folders in preview mode')
+    parser.add_argument('--max-workers', type=int, help='maximum number of threads')
     parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                       default='INFO', help='日志级别')
-    parser.add_argument('--log-file', type=str, help='日志文件路径')
-    parser.add_argument('--create-config', type=str, help='创建配置文件模板')
-    parser.add_argument('--no-visual', action='store_true', help='不生成可视化报告')
-    parser.add_argument('--no-csv', action='store_true', help='不导出CSV文件')
+                       default='INFO', help='log level')
+    parser.add_argument('--log-file', type=str, help='log file path')
+    parser.add_argument('--create-config', type=str, help='create config file template')
+    parser.add_argument('--no-visual', action='store_true', help='do not generate visual report')
+    parser.add_argument('--no-csv', action='store_true', help='do not export CSV file')
     
     args = parser.parse_args()
-    
-    # 创建配置文件模板
+
     if args.create_config:
         save_config_template(args.create_config)
         return
-    
-    # 加载配置
+
     if args.config:
         config = load_config(args.config)
         if not config:
-            print("配置文件加载失败，使用默认配置")
+            print("loading config failed, using default config")
             config = create_default_config()
     else:
         config = create_default_config()
-    
-    # 命令行参数覆盖配置文件
+
     if args.source:
         config['source_root'] = args.source
     if args.output:
@@ -164,27 +128,24 @@ def main():
         config['reports']['export_csv'] = False
     
     config['logging']['level'] = args.log_level
-    
-    # 设置日志
+
     setup_logging(config['logging']['level'], config['logging'].get('file'))
     logger = logging.getLogger(__name__)
-    
-    # 验证必要参数
+
     if not config.get('source_root'):
-        logger.error("请指定源文件夹路径 (--source 或在配置文件中设置)")
+        logger.error("please specify the source folder path (--source or set in config file)")
         return 1
     
     if not config.get('output_root'):
-        logger.error("请指定输出文件夹路径 (--output 或在配置文件中设置)")
+        logger.error("please specify the output folder path (--output or set in config file)")
         return 1
-    
-    # 检查源文件夹是否存在
+
     source_path = Path(config['source_root'])
     if not source_path.exists():
-        logger.error(f"源文件夹不存在: {source_path}")
+        logger.error(f"source folder does not exist: {source_path}")
         return 1
     
-    import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
     processor = BatchImageProcessor(
         source_root=config['source_root'],
         output_root=config['output_root'],
@@ -195,46 +156,41 @@ def main():
     
     # 预览模式
     if args.preview:
-        logger.info("运行预览模式...")
+        logger.info("preview mode.")
         preview_results = processor.preview_processing(args.max_folders)
         
         print("\n" + "="*50)
-        print("预览结果")
+        print("Preview Results")
         print("="*50)
-        print(f"总共找到文件夹数: {preview_results['total_found_folders']}")
-        print(f"预览文件夹数: {preview_results['preview_folder_count']}")
+        print(f"Total found folders: {preview_results['total_found_folders']}")
+        print(f"Preview folder count: {preview_results['preview_folder_count']}")
         print("-" * 50)
         
         for folder_info in preview_results['preview_folders']:
-            print(f"文件夹: {folder_info['folder_name']}")
-            print(f"  图像-JSON对数: {folder_info['image_json_txt_triples']}")
-            print(f"  路径: {folder_info['folder_path']}")
+            print(f"Folder: {folder_info['folder_name']}")
+            print(f"  Image-JSON pairs: {folder_info['image_json_txt_triples']}")
+            print(f"  Path: {folder_info['folder_path']}")
             print()
         
         print("="*50)
         return 0
-    
-    # 正式处理
-    logger.info("开始批量处理...")
+
+    logger.info("Starting batch processing...")
     try:
         results = processor.run()
-        
-        # 生成报告
+
         output_path = Path(config['output_root'])
         report_generator = ReportGenerator(output_path)
-        
-        # 生成基础报告
+ 
         processing_time = results.get('processing_time', 0)
         report = report_generator.generate_processing_report(
             results, 
             processing_time, 
             processor.classifier.get_thresholds()
         )
-        
-        # 生成详细分析
+
         detailed_analysis = report_generator.generate_detailed_analysis(results)
-        
-        # 生成可视化报告
+ 
         if config['reports']['generate_visual']:
             try:
                 visual_info = report_generator.generate_visual_report(
@@ -242,91 +198,80 @@ def main():
                     config['reports']['save_plots']
                 )
                 if visual_info:
-                    logger.info("可视化报告生成成功")
+                    logger.info("visual report generated successfully")
             except Exception as e:
-                logger.warning(f"生成可视化报告时出错: {e}")
-        
-        # 导出CSV
+                logger.warning(f"Error generating visual report: {e}")
+
         if config['reports']['export_csv']:
             try:
                 csv_path = report_generator.export_to_csv(results)
                 if csv_path:
-                    logger.info(f"CSV文件已导出: {csv_path}")
+                    logger.info(f"CSV file exported successfully: {csv_path}")
             except Exception as e:
-                logger.warning(f"导出CSV时出错: {e}")
-        
-        # 打印摘要
+                logger.warning(f"Error exporting CSV: {e}")
+
         report_generator.print_summary(report)
         
-        logger.info("批量处理完成！")
+        logger.info("Batch processing completed successfully!")
         return 0
         
     except KeyboardInterrupt:
-        logger.info("用户中断处理")
+        logger.info("User interrupted processing")
         return 1
     except Exception as e:
-        logger.error(f"处理过程中出现错误: {e}", exc_info=True)
+        logger.error(f"An error occurred during processing: {e}", exc_info=True)
         return 1
 
 
 def run_interactive_mode():
-    """交互式运行模式"""
     print("="*60)
-    print("图像清晰度分类工具 - 交互模式")
+    print("Image Sharpness Classifier - Interactive Mode")
     print("="*60)
-    
-    # 获取用户输入
-    source_root = input("请输入源文件夹路径: ").strip()
+
+    source_root = input("Please enter the source folder path: ").strip()
     if not source_root:
-        print("源文件夹路径不能为空")
+        print("Source folder path cannot be empty")
         return 1
     
-    output_root = input("请输入输出文件夹路径: ").strip()
+    output_root = input("Please enter the output folder path: ").strip()
     if not output_root:
-        print("输出文件夹路径不能为空")  
+        print("Output folder path cannot be empty")  
         return 1
-    
-    # 询问是否使用默认设置
-    use_default = input("是否使用默认设置? (y/n, 默认y): ").strip().lower()
+
+    use_default = input("Would you like to use default settings? (y/n, default y): ").strip().lower()
     
     config = create_default_config()
     config['source_root'] = source_root
     config['output_root'] = output_root
     
     if use_default not in ['y', 'yes', '']:
-        # 自定义设置
         try:
-            max_workers = input(f"最大线程数 (默认{config['processing']['max_workers']}): ").strip()
+            max_workers = input(f"Maximum number of threads (default {config['processing']['max_workers']}): ").strip()
             if max_workers:
                 config['processing']['max_workers'] = int(max_workers)
-            
-            # 分类器阈值设置
-            print("\n分类器阈值设置 (直接回车使用默认值):")
+
+            print("\nClassifier threshold settings (press enter to use default):")
             thresholds = config['classifier_params']
             
             for key, default_value in thresholds.items():
-                user_input = input(f"{key} (默认{default_value}): ").strip()
+                user_input = input(f"{key} (default {default_value}): ").strip()
                 if user_input:
                     thresholds[key] = float(user_input)
                     
         except ValueError as e:
-            print(f"输入值错误: {e}")
+            print(f"Input value error: {e}")
             return 1
-    
-    # 设置日志
+
     setup_logging(config['logging']['level'])
     logger = logging.getLogger(__name__)
-    
-    # 检查源文件夹
+  
     source_path = Path(source_root)
     if not source_path.exists():
-        print(f"源文件夹不存在: {source_path}")
+        print(f"Source folder does not exist:  {source_path}")
         return 1
-    
-    # 询问是否先预览
-    preview = input("是否先预览处理结果? (y/n, 默认n): ").strip().lower()
-    
-    # 创建处理器
+
+    preview = input("Would you like to preview the processing results? (y/n, default n): ").strip().lower()
+
     processor = BatchImageProcessor(
         source_root=config['source_root'],
         output_root=config['output_root'],
@@ -336,24 +281,22 @@ def run_interactive_mode():
     )
     
     if preview in ['y', 'yes']:
-        print("\n预览处理结果...")
+        print("\nPreviewing processing results...")
         preview_results = processor.preview_processing(3)
         
-        print(f"\n找到 {preview_results['total_found_folders']} 个时间文件夹")
+        print(f"\nFound {preview_results['total_found_folders']} time folders")
         for folder_info in preview_results['preview_folders']:
-            print(f"- {folder_info['folder_name']}: {folder_info['image_json_txt_triples']} 个图像对")
+            print(f"- {folder_info['folder_name']}: {folder_info['image_json_txt_triples']} time-image pairs")
         
-        continue_process = input("\n是否继续完整处理? (y/n): ").strip().lower()
+        continue_process = input("\nWould you like to continue with the full processing? (y/n): ").strip().lower()
         if continue_process not in ['y', 'yes']:
-            print("已取消处理")
+            print("Processing has been canceled")
             return 0
-    
-    # 开始处理
-    print("\n开始批量处理...")
+
+    print("\nStarting batch processing...")
     try:
         results = processor.run()
-        
-        # 生成报告
+ 
         output_path = Path(config['output_root'])
         report_generator = ReportGenerator(output_path)
         
@@ -363,23 +306,21 @@ def run_interactive_mode():
             processing_time, 
             processor.classifier.get_thresholds()
         )
-        
-        # 打印摘要
+
         report_generator.print_summary(report)
         
-        print(f"\n处理完成！结果保存在: {output_path}")
+        print(f"\nProcessing completed! Results saved at: {output_path}")
         return 0
         
     except KeyboardInterrupt:
-        print("\n用户中断处理")
+        print("\nUser interrupted processing")
         return 1
     except Exception as e:
-        print(f"\n处理过程中出现错误: {e}")
+        print(f"\nAn error occurred during processing: {e}")
         return 1
 
 
 if __name__ == "__main__":
-    # 如果没有命令行参数，进入交互模式
     if len(sys.argv) == 1:
         exit_code = run_interactive_mode()
     else:

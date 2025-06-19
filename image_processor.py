@@ -58,7 +58,7 @@ class ImageProcessor:
             }
 
         except Exception as e:
-            error_msg = f"处理图像失败 {image_path}: {str(e)}"
+            error_msg = f"processing failed {image_path}: {str(e)}"
             logger.error(error_msg)
 
             return {
@@ -68,19 +68,10 @@ class ImageProcessor:
             }
 
     def process_image_with_single_method(self, image_path: Path, method: str) -> Dict:
-        """使用单一方法处理图像
-        
-        Args:
-            image_path: 图像文件路径
-            method: 分类方法
-            
-        Returns:
-            处理结果字典
-        """
         try:
             image = cv2.imread(str(image_path))
             if image is None:
-                raise ValueError(f"无法读取图像: {image_path}")
+                raise ValueError(f"unable to read image: {image_path}")
 
             classification, metric_value = self.classifier.classify_single_method(image, method)
 
@@ -94,7 +85,7 @@ class ImageProcessor:
             }
 
         except Exception as e:
-            error_msg = f"处理图像失败 {image_path}: {str(e)}"
+            error_msg = f"processing failed {image_path}: {str(e)}"
             logger.error(error_msg)
 
             return {
@@ -105,15 +96,6 @@ class ImageProcessor:
             }
 
     def batch_analyze_images(self, image_paths: list, method: str = 'ensemble') -> Dict:
-        """批量分析图像
-        
-        Args:
-            image_paths: 图像路径列表
-            method: 分析方法（'ensemble' 或具体方法名）
-            
-        Returns:
-            批量分析结果
-        """
         results = []
         sharp_count = 0
         error_count = 0
@@ -123,7 +105,7 @@ class ImageProcessor:
                 try:
                     image = cv2.imread(str(image_path))
                     if image is None:
-                        raise ValueError(f"无法读取图像: {image_path}")
+                        raise ValueError(f"unable to read image: {image_path}")
                     
                     classification, metrics = self.classifier.classify_with_ensemble(image)
                     result = {
@@ -162,8 +144,6 @@ class ImageProcessor:
 
 
 class ProcessingStats:
-    """处理统计信息"""
-
     def __init__(self):
         self.lock = Lock()
         self.processed_count = 0
@@ -172,27 +152,22 @@ class ProcessingStats:
         self.error_count = 0
 
     def increment_processed(self):
-        """增加已处理计数"""
         with self.lock:
             self.processed_count += 1
 
     def increment_sharp(self):
-        """增加清晰图像计数"""
         with self.lock:
             self.sharp_count += 1
 
     def increment_blurry(self):
-        """增加模糊图像计数"""
         with self.lock:
             self.blurry_count += 1
 
     def increment_error(self):
-        """增加错误计数"""
         with self.lock:
             self.error_count += 1
 
     def get_stats(self) -> Dict:
-        """获取统计信息"""
         with self.lock:
             return {
                 'processed': self.processed_count,
@@ -202,7 +177,6 @@ class ProcessingStats:
             }
 
     def reset(self):
-        """重置统计信息"""
         with self.lock:
             self.processed_count = 0
             self.sharp_count = 0
