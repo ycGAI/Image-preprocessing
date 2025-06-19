@@ -184,7 +184,7 @@ def main():
         logger.error(f"源文件夹不存在: {source_path}")
         return 1
     
-    # 创建批量处理器
+    import ipdb; ipdb.set_trace()
     processor = BatchImageProcessor(
         source_root=config['source_root'],
         output_root=config['output_root'],

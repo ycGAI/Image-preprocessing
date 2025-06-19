@@ -44,7 +44,6 @@ class ImageProcessor:
             target_json_path = target_folder / json_path.name
             self.file_utils.write_json_file(target_json_path, json_data)
 
-            # 如果有TXT文件，也复制过去
             
             if txt_path and txt_path.exists():
                 target_txt_path = target_folder / txt_path.name

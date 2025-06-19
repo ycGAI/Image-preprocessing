@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class BatchImageProcessor:
-    """批量图像处理器"""
 
     def __init__(self,
                  source_root: str,
@@ -22,20 +21,11 @@ class BatchImageProcessor:
                  classifier_params: Optional[Dict] = None,
                  max_workers: int = 4,
                  supported_formats: Optional[List[str]] = None):
-        """初始化批量处理器
-        
-        Args:
-            source_root: 源文件夹根目录
-            output_root: 输出文件夹根目录
-            classifier_params: 分类器参数
-            max_workers: 最大线程数
-            supported_formats: 支持的文件格式
-        """
+
         self.source_root = Path(source_root)
         self.output_root = Path(output_root)
         self.max_workers = max_workers
 
-        # 初始化组件
         if classifier_params is None:
             classifier_params = {}
         self.classifier = ImageSharpnessClassifier(**classifier_params)
@@ -55,22 +45,10 @@ class BatchImageProcessor:
 
     def process_single_image_wrapper(self, image_path: Path, json_path: Path, 
                                    output_folder: Path, txt_path: Optional[Path] = None) -> Dict:
-        """单个图像处理包装器（用于线程池）
-        
-        Args:
-            image_path: 图像文件路径
-            json_path: JSON文件路径
-            output_folder: 输出文件夹
-            txt_path: TXT文件路径（可选）
-            
-        Returns:
-            处理结果
-        """
-        # import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace()
         result = self.image_processor.process_single_image(
             image_path, json_path, output_folder, txt_path)
         
-        # 更新统计信息
         self.stats.increment_processed()
         if result['status'] == 'success':
             if result['classification'] == "sharp":
@@ -83,16 +61,8 @@ class BatchImageProcessor:
         return result
 
     def process_folder(self, source_folder: Path) -> Dict:
-        """处理单个时间文件夹
-        
-        Args:
-            source_folder: 源文件夹路径
-            
-        Returns:
-            文件夹处理结果
-        """
         folder_name = source_folder.name
-        logger.info(f"开始处理文件夹: {folder_name}")
+        logger.info(f"start processing folder: {folder_name}")
 
         # 创建输出文件夹
         output_folder = self.output_root / folder_name
@@ -106,7 +76,7 @@ class BatchImageProcessor:
         # image_json_txt_triples = self.file_utils.find_image_json_txt_triples(source_folder)
 
         if not image_json_txt_triples:
-            logger.warning(f"文件夹 {folder_name} 中没有找到图像-JSON对")
+            logger.warning(f"file {folder_name} not found or no image-JSON pairs")
             return {
                 'folder': folder_name,
                 'processed': 0,
