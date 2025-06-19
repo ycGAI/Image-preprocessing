@@ -65,8 +65,8 @@ class FileUtils:
         logger.info(f"找到 {len(time_folders)} 个时间文件夹")
         return sorted(time_folders)
 
-    def find_image_json_pairs(self, folder: Path) -> List[Tuple[Path, Path]]:
-        """查找图像-JSON文件对
+    def find_image_json_txt_triples(self, folder: Path) -> List[Tuple[Path, Path, Path]]:
+        """查找图像-JSON-TXT文件三元组
         
         Args:
             folder: 文件夹路径

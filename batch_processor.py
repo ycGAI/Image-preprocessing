@@ -66,13 +66,14 @@ class BatchImageProcessor:
         Returns:
             处理结果
         """
+        # import ipdb; ipdb.set_trace()
         result = self.image_processor.process_single_image(
             image_path, json_path, output_folder, txt_path)
         
         # 更新统计信息
         self.stats.increment_processed()
         if result['status'] == 'success':
-            if result['classification'] == "清晰":
+            if result['classification'] == "sharp":
                 self.stats.increment_sharp()
             else:
                 self.stats.increment_blurry()
@@ -98,12 +99,13 @@ class BatchImageProcessor:
         self.file_utils.create_directory(output_folder)
 
         # 查找文件对
-        image_json_pairs = self.file_utils.find_image_json_pairs(source_folder)
-        
+        # image_json_pairs = self.file_utils.find_image_json_pairs(source_folder)
+        image_json_txt_triples = self.file_utils.find_image_json_txt_triples(source_folder)
+
         # 如果需要处理TXT文件，可以使用三元组
         # image_json_txt_triples = self.file_utils.find_image_json_txt_triples(source_folder)
 
-        if not image_json_pairs:
+        if not image_json_txt_triples:
             logger.warning(f"文件夹 {folder_name} 中没有找到图像-JSON对")
             return {
                 'folder': folder_name,
@@ -113,23 +115,30 @@ class BatchImageProcessor:
                 'errors': 0
             }
 
-        logger.info(f"文件夹 {folder_name} 中找到 {len(image_json_pairs)} 个图像-JSON对")
+        logger.info(f"文件夹 {folder_name} 中找到 {len(image_json_txt_triples)} 个图像-JSON对")
 
         # 多线程处理图像
         folder_results = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # 提交任务
-            future_to_pair = {
+            # future_to_pair = {
+            #     executor.submit(
+            #         self.process_single_image_wrapper,
+            #         img_path, json_path, output_folder
+            #     ): (img_path, json_path)
+            #     for img_path, json_path in image_json_pairs
+            # }
+            future_to_triple = {
                 executor.submit(
                     self.process_single_image_wrapper,
-                    img_path, json_path, output_folder
-                ): (img_path, json_path)
-                for img_path, json_path in image_json_pairs
+                    img_path, json_path, output_folder, txt_path  # 添加txt_path参数
+                ): (img_path, json_path, txt_path)
+                for img_path, json_path, txt_path in image_json_txt_triples
             }
 
             # 收集结果
-            with tqdm(total=len(image_json_pairs), desc=f"处理 {folder_name}") as pbar:
-                for future in as_completed(future_to_pair):
+            with tqdm(total=len(image_json_txt_triples), desc=f"处理 {folder_name}") as pbar:
+                for future in as_completed(future_to_triple):
                     result = future.result()
                     folder_results.append(result)
                     pbar.update(1)
@@ -138,8 +147,8 @@ class BatchImageProcessor:
         folder_stats = {
             'folder': folder_name,
             'processed': len([r for r in folder_results if r['status'] == 'success']),
-            'sharp': len([r for r in folder_results if r.get('classification') == '清晰']),
-            'blurry': len([r for r in folder_results if r.get('classification') == '模糊']),
+            'sharp': len([r for r in folder_results if r.get('classification') == 'sharp']),
+            'blurry': len([r for r in folder_results if r.get('classification') == 'blurry']),
             'errors': len([r for r in folder_results if r['status'] == 'error'])
         }
 
@@ -186,6 +195,8 @@ class BatchImageProcessor:
 
         # 计算总耗时
         total_time = time.time() - start_time
+
+        self.results['processing_time'] = total_time
 
         # 生成处理报告
         self.generate_report(total_time)
@@ -347,10 +358,10 @@ class BatchImageProcessor:
         }
         
         for folder in preview_folders:
-            pairs = self.file_utils.find_image_json_pairs(folder)
+            pairs = self.file_utils.image_json_txt_triples(folder)
             preview_results['preview_folders'].append({
                 'folder_name': folder.name,
-                'image_json_pairs': len(pairs),
+                'image_json_txt_triples': len(pairs),
                 'folder_path': str(folder)
             })
         

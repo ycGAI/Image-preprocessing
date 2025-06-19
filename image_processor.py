@@ -13,65 +13,39 @@ logger = logging.getLogger(__name__)
 
 
 class ImageProcessor:
-    """单个图像处理器"""
-
     def __init__(self, classifier: ImageSharpnessClassifier, file_utils: FileUtils):
-        """初始化图像处理器
-        
-        Args:
-            classifier: 清晰度分类器
-            file_utils: 文件工具
-        """
         self.classifier = classifier
         self.file_utils = file_utils
         
     def process_single_image(self, image_path: Path, json_path: Path, 
                            output_folder: Path, txt_path: Optional[Path] = None) -> Dict:
-        """处理单个图像
-        
-        Args:
-            image_path: 图像文件路径
-            json_path: JSON文件路径
-            output_folder: 输出文件夹
-            txt_path: TXT文件路径（可选）
-            
-        Returns:
-            处理结果字典
-        """
         try:
-            # 读取图像
             image = cv2.imread(str(image_path))
             if image is None:
-                raise ValueError(f"无法读取图像: {image_path}")
+                raise ValueError(f"unable to read image: {image_path}")
 
-            # 进行清晰度分类
             classification, metrics = self.classifier.classify_with_ensemble(image)
 
-            # 读取JSON文件
             json_data = self.file_utils.read_json_file(json_path)
-
-            # 添加清晰度分析结果
-            json_data['sharpness_analysis'] = {
-                'classification': classification,
-                'metrics': {k: float(v) for k, v in metrics.items()},
-                'thresholds': self.classifier.get_thresholds(),
-                'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S')
-            }
-
-            # 确定目标文件夹
-            target_category = "清晰" if classification == "清晰" else "模糊"
+            # json_data['sharpness_analysis'] = {
+            #     'classification': classification,
+            #     'metrics': {k: float(v) for k, v in metrics.items()},
+            #     'thresholds': self.classifier.get_thresholds(),
+            #     'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S')
+            # }
+            target_category = "sharp" if classification == "sharp" else "blurry"
             target_folder = output_folder / target_category
             self.file_utils.create_directory(target_folder)
 
-            # 复制图像文件
             target_image_path = target_folder / image_path.name
             self.file_utils.copy_file_safely(image_path, target_image_path)
 
-            # 保存更新后的JSON文件
+
             target_json_path = target_folder / json_path.name
             self.file_utils.write_json_file(target_json_path, json_data)
 
             # 如果有TXT文件，也复制过去
+            
             if txt_path and txt_path.exists():
                 target_txt_path = target_folder / txt_path.name
                 self.file_utils.copy_file_safely(txt_path, target_txt_path)
@@ -159,7 +133,7 @@ class ImageProcessor:
                         'classification': classification,
                         'metrics': metrics
                     }
-                    if classification == "清晰":
+                    if classification == "sharp":
                         sharp_count += 1
                         
                 except Exception as e:
@@ -171,7 +145,7 @@ class ImageProcessor:
                     error_count += 1
             else:
                 result = self.process_image_with_single_method(Path(image_path), method)
-                if result['status'] == 'success' and result['classification'] == "清晰":
+                if result['status'] == 'success' and result['classification'] == "sharp":
                     sharp_count += 1
                 elif result['status'] == 'error':
                     error_count += 1

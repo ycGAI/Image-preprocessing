@@ -207,7 +207,7 @@ def main():
         
         for folder_info in preview_results['preview_folders']:
             print(f"文件夹: {folder_info['folder_name']}")
-            print(f"  图像-JSON对数: {folder_info['image_json_pairs']}")
+            print(f"  图像-JSON对数: {folder_info['image_json_txt_triples']}")
             print(f"  路径: {folder_info['folder_path']}")
             print()
         
@@ -341,7 +341,7 @@ def run_interactive_mode():
         
         print(f"\n找到 {preview_results['total_found_folders']} 个时间文件夹")
         for folder_info in preview_results['preview_folders']:
-            print(f"- {folder_info['folder_name']}: {folder_info['image_json_pairs']} 个图像对")
+            print(f"- {folder_info['folder_name']}: {folder_info['image_json_txt_triples']} 个图像对")
         
         continue_process = input("\n是否继续完整处理? (y/n): ").strip().lower()
         if continue_process not in ['y', 'yes']:

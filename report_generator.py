@@ -215,7 +215,7 @@ class ReportGenerator:
         sharp = results.get('sharp_images', 0)
         blurry = results.get('blurry_images', 0)
         
-        labels = ['清晰', '模糊']
+        labels = ['sharp', 'blurry']
         sizes = [sharp, blurry]
         colors = ['#2ecc71', '#e74c3c']
         
@@ -244,8 +244,8 @@ class ReportGenerator:
         width = 0.35
         
         plt.figure(figsize=(12, 6))
-        plt.bar([i - width/2 for i in x], sharp_counts, width, label='清晰', color='#2ecc71')
-        plt.bar([i + width/2 for i in x], blurry_counts, width, label='模糊', color='#e74c3c')
+        plt.bar([i - width/2 for i in x], sharp_counts, width, label='sharp', color='#2ecc71')
+        plt.bar([i + width/2 for i in x], blurry_counts, width, label='blurry', color='#e74c3c')
         
         plt.xlabel('文件夹')
         plt.ylabel('图像数量')

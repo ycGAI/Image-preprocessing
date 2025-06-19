@@ -9,7 +9,7 @@
       "variance_threshold": 50.0
     },
     "processing": {
-      "max_workers": 4,
+      "max_workers": 1,
       "supported_formats": [
         ".jpg",
         ".jpeg", 
