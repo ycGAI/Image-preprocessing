@@ -2,10 +2,10 @@
     "source_root": "/media/gyc/Backup Plus4/gyc/ATB_data/raw_data",
     "output_root": "/media/gyc/Backup Plus4/gyc/ATB_data/output",
     "classifier_params": {
-      "laplacian_threshold": 100.0,
-      "sobel_threshold": 50.0,
-      "brenner_threshold": 1000.0,
-      "tenengrad_threshold": 500.0,
+      "laplacian_threshold": 200.0,
+      "sobel_threshold": 100.0,
+      "brenner_threshold": 2000.0,
+      "tenengrad_threshold": 1000.0,
       "variance_threshold": 50.0
     },
     "processing": {

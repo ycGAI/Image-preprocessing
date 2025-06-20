@@ -1,0 +1,92 @@
+{
+  "analysis_summary": {
+    "folder_path": "/media/gyc/Backup Plus4/gyc/ATB_data/raw_data/20250530",
+    "total_images": 100,
+    "analyzed_images": 100,
+    "failed_images": 0
+  },
+  "current_thresholds": {
+    "laplacian": 100.0,
+    "sobel": 50.0,
+    "brenner": 1000.0,
+    "tenengrad": 500.0
+  },
+  "suggested_thresholds": {
+    "laplacian": 181.44470443642274,
+    "sobel": 1676.4496807476414,
+    "brenner": 310133918.4,
+    "tenengrad": 15753201181.0
+  },
+  "statistics": {
+    "laplacian": {
+      "min": 53.46351025051277,
+      "max": 1275.3404199574545,
+      "mean": 294.33822267626186,
+      "median": 276.4227734228288,
+      "std": 133.99209189790767,
+      "q25": 240.90575262889192,
+      "q75": 337.40217049742114,
+      "q90": 363.5593849968134,
+      "q95": 390.77702983840567
+    },
+    "sobel": {
+      "min": 529.6747284694126,
+      "max": 15739.449175746979,
+      "mean": 2709.262711781591,
+      "median": 2382.365505867527,
+      "std": 1642.578255158825,
+      "q25": 1909.1017894005972,
+      "q75": 3015.444930653669,
+      "q90": 3408.42158456536,
+      "q95": 3942.8681334575467
+    },
+    "brenner": {
+      "min": 81899390.0,
+      "max": 2316420184.0,
+      "mean": 541658581.85,
+      "median": 504376864.5,
+      "std": 244459799.85662365,
+      "q25": 426847946.0,
+      "q75": 662877313.5,
+      "q90": 715095541.3000001,
+      "q95": 790648046.1
+    },
+    "tenengrad": {
+      "min": 3327178118.0,
+      "max": 143304563912.0,
+      "mean": 24446648800.36,
+      "median": 22105924137.0,
+      "std": 14616289092.9836,
+      "q25": 17942869462.0,
+      "q75": 27492874054.0,
+      "q90": 31587321977.4,
+      "q95": 33736862692.899998
+    }
+  },
+  "threshold_comparison": {
+    "laplacian": {
+      "current_sharp_ratio": 0.99,
+      "suggested_sharp_ratio": 0.9,
+      "threshold_change": 81.44470443642274,
+      "threshold_change_ratio": 0.8144470443642274
+    },
+    "sobel": {
+      "current_sharp_ratio": 1.0,
+      "suggested_sharp_ratio": 0.9,
+      "threshold_change": 1626.4496807476414,
+      "threshold_change_ratio": 32.52899361495283
+    },
+    "brenner": {
+      "current_sharp_ratio": 1.0,
+      "suggested_sharp_ratio": 0.9,
+      "threshold_change": 310132918.4,
+      "threshold_change_ratio": 310132.91839999997
+    },
+    "tenengrad": {
+      "current_sharp_ratio": 1.0,
+      "suggested_sharp_ratio": 0.9,
+      "threshold_change": 15753200681.0,
+      "threshold_change_ratio": 31506401.362
+    }
+  }
+}
