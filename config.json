@@ -1,11 +1,11 @@
 {
-    "source_root": "/media/gyc/Backup Plus4/gyc/ATB_data/raw_data",
-    "output_root": "/media/gyc/Backup Plus4/gyc/ATB_data/output",
+    "source_root": "/media/gyc/Backup Plus5/gyc/ATB_data/raw_data",
+    "output_root": "/media/gyc/Backup Plus5/gyc/ATB_data/output_test",
     "classifier_params": {
-      "laplacian_threshold": 200.0,
-      "sobel_threshold": 100.0,
-      "brenner_threshold": 2000.0,
-      "tenengrad_threshold": 1000.0,
+      "laplacian_threshold": 461.70,
+      "sobel_threshold": 3549.31,
+      "brenner_threshold": 119649235.80,
+      "tenengrad_threshold": 5108169773.39,
       "variance_threshold": 50.0
     },
     "processing": {

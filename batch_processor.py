@@ -217,7 +217,7 @@ class BatchImageProcessor:
 
         # 计算总耗时
         total_time = time.time() - start_time
-
+        self.results['processing_time'] = total_time
         # 生成处理报告
         self.generate_report(total_time)
 
