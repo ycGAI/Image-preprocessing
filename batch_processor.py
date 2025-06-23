@@ -97,11 +97,37 @@ class BatchImageProcessor:
         output_folder = self.output_root / folder_name
         self.file_utils.create_directory(output_folder)
 
-        # 查找图像-JSON对（包括有TXT和没有TXT的情况）
-        image_json_pairs = self.file_utils.find_image_json_pairs(source_folder)
+        # 直接在这里实现文件查找逻辑，支持图像+JSON(+可选TXT)
+        files = list(source_folder.glob('*'))
         
-        # 查找图像-JSON-TXT三元组
-        image_json_txt_triples = self.file_utils.find_image_json_txt_triples(source_folder)
+        # 按文件名分组
+        file_groups = {}
+        for file in files:
+            if file.is_file():
+                stem = file.stem
+                if stem not in file_groups:
+                    file_groups[stem] = []
+                file_groups[stem].append(file)
+
+        # 查找图像-JSON对，可能包含TXT
+        image_json_pairs = []
+        for stem, file_list in file_groups.items():
+            image_file = None
+            json_file = None
+            txt_file = None
+
+            for file in file_list:
+                ext = file.suffix.lower()
+                if ext in self.file_utils.supported_formats:
+                    image_file = file
+                elif ext == '.json':
+                    json_file = file
+                elif ext == '.txt':
+                    txt_file = file
+
+            # 只要有图像和JSON就添加（TXT是可选的）
+            if image_file and json_file:
+                image_json_pairs.append((image_file, json_file, txt_file))
 
         if not image_json_pairs:
             logger.warning(f"文件夹 {folder_name} 中没有找到图像-JSON对")
@@ -113,42 +139,29 @@ class BatchImageProcessor:
                 'errors': 0
             }
 
+        # 统计文件类型
+        with_txt = sum(1 for _, _, txt in image_json_pairs if txt is not None)
+        without_txt = len(image_json_pairs) - with_txt
+        
         logger.info(f"文件夹 {folder_name} 中找到 {len(image_json_pairs)} 个图像-JSON对")
-        logger.info(f"文件夹 {folder_name} 中找到 {len(image_json_txt_triples)} 个图像-JSON-TXT三元组")
-
-        # 准备处理任务列表
-        processing_tasks = []
-        
-        # 先将三元组转换为(image, json, txt)的形式，并记录已处理的图像
-        processed_images = set()
-        for img_path, json_path, txt_path in image_json_txt_triples:
-            processing_tasks.append((img_path, json_path, txt_path))
-            processed_images.add(img_path)
-        
-        # 然后添加只有图像-JSON对的情况（排除已经在三元组中的）
-        for img_path, json_path in image_json_pairs:
-            if img_path not in processed_images:
-                processing_tasks.append((img_path, json_path, None))
-
-        logger.info(f"文件夹 {folder_name} 总共需要处理 {len(processing_tasks)} 个文件组合")
+        logger.info(f"  - 包含TXT文件: {with_txt} 个")
+        logger.info(f"  - 仅有JSON文件: {without_txt} 个")
 
         # 多线程处理图像
         folder_results = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # 提交任务
-            future_to_task = {}
-            for task in processing_tasks:
-                if len(task) == 3:  # (image, json, txt) 或 (image, json, None)
-                    img_path, json_path, txt_path = task
-                    future = executor.submit(
-                        self.process_single_image_wrapper,
-                        img_path, json_path, output_folder, txt_path
-                    )
-                    future_to_task[future] = task
+            future_to_pair = {}
+            for img_path, json_path, txt_path in image_json_pairs:
+                future = executor.submit(
+                    self.process_single_image_wrapper,
+                    img_path, json_path, output_folder, txt_path
+                )
+                future_to_pair[future] = (img_path, json_path, txt_path)
 
             # 收集结果
-            with tqdm(total=len(processing_tasks), desc=f"处理 {folder_name}") as pbar:
-                for future in as_completed(future_to_task):
+            with tqdm(total=len(image_json_pairs), desc=f"处理 {folder_name}") as pbar:
+                for future in as_completed(future_to_pair):
                     result = future.result()
                     folder_results.append(result)
                     pbar.update(1)
@@ -164,7 +177,6 @@ class BatchImageProcessor:
 
         logger.info(f"文件夹 {folder_name} 处理完成: {folder_stats}")
         return folder_stats
-
     def run(self) -> Dict:
         """运行批量处理
         
