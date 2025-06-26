@@ -72,7 +72,7 @@ class BatchImageProcessor:
         # 更新统计信息
         self.stats.increment_processed()
         if result['status'] == 'success':
-            if result['classification'] == "清晰":
+            if result['classification'] == "sharp":
                 self.stats.increment_sharp()
             else:
                 self.stats.increment_blurry()
@@ -170,8 +170,8 @@ class BatchImageProcessor:
         folder_stats = {
             'folder': folder_name,
             'processed': len([r for r in folder_results if r['status'] == 'success']),
-            'sharp': len([r for r in folder_results if r.get('classification') == '清晰']),
-            'blurry': len([r for r in folder_results if r.get('classification') == '模糊']),
+            'sharp': len([r for r in folder_results if r.get('classification') == 'sharp']),
+            'blurry': len([r for r in folder_results if r.get('classification') == 'blurry']),
             'errors': len([r for r in folder_results if r['status'] == 'error'])
         }
 
