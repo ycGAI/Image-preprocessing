@@ -70,11 +70,8 @@ def create_default_config() -> Dict:
             "dark_pixel_threshold": 15
         },
         "position_params": {
-            "similarity_threshold": 0.95,
-            "feature_method": "orb",  # orb, sift, template
-            "max_features": 500,
-            "histogram_weight": 0.3,
-            "structural_weight": 0.7
+            "gps_distance_threshold": 2.0,
+            "rotation_threshold": 0.1
         },
         "work_area_params": {
             "green_threshold": 0.15,
@@ -151,7 +148,8 @@ def main():
     parser.add_argument('--sharpness-threshold', type=float, help='清晰度阈值')
     parser.add_argument('--overexposure-threshold', type=float, help='过曝阈值')
     parser.add_argument('--underexposure-threshold', type=float, help='欠曝阈值')
-    parser.add_argument('--similarity-threshold', type=float, help='位置相似度阈值')
+    parser.add_argument('--gps-distance-threshold', type=float, help='GPS距离阈值（米）')
+    parser.add_argument('--rotation-threshold', type=float, help='旋转差异阈值')
     parser.add_argument('--green-threshold', type=float, help='绿色植被阈值')
     
     args = parser.parse_args()
@@ -189,8 +187,10 @@ def main():
         config['exposure_params']['overexposure_threshold'] = args.overexposure_threshold
     if args.underexposure_threshold:
         config['exposure_params']['underexposure_threshold'] = args.underexposure_threshold
-    if args.similarity_threshold:
-        config['position_params']['similarity_threshold'] = args.similarity_threshold
+    if args.gps_distance_threshold:
+        config['position_params']['gps_distance_threshold'] = args.gps_distance_threshold
+    if args.rotation_threshold:
+        config['position_params']['rotation_threshold'] = args.rotation_threshold
     if args.green_threshold:
         config['work_area_params']['green_threshold'] = args.green_threshold
     
@@ -325,10 +325,14 @@ def run_interactive_mode():
             if under_threshold:
                 config['exposure_params']['underexposure_threshold'] = float(under_threshold)
             
-            # 位置相似度阈值
-            sim_threshold = input(f"位置相似度阈值 (默认{config['position_params']['similarity_threshold']}): ").strip()
-            if sim_threshold:
-                config['position_params']['similarity_threshold'] = float(sim_threshold)
+            # 位置检测阈值
+            gps_threshold = input(f"GPS距离阈值，米 (默认{config['position_params']['gps_distance_threshold']}): ").strip()
+            if gps_threshold:
+                config['position_params']['gps_distance_threshold'] = float(gps_threshold)
+                
+            rotation_threshold = input(f"旋转差异阈值 (默认{config['position_params']['rotation_threshold']}): ").strip()
+            if rotation_threshold:
+                config['position_params']['rotation_threshold'] = float(rotation_threshold)
             
             # 工作区域阈值
             green_threshold = input(f"植被检测阈值 (默认{config['work_area_params']['green_threshold']}): ").strip()

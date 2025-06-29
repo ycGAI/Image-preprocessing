@@ -193,7 +193,13 @@ class EnhancedImageProcessor:
             
         # 检测同位置拍摄的图像组
         logger.info("检测同位置拍摄的图像...")
-        same_position_groups = self.position_detector.detect_same_position_groups(image_paths)
+        # 提取图像路径和JSON路径
+        image_paths = [pair[0] for pair in image_json_pairs]
+        json_paths = [pair[1] for pair in image_json_pairs]
+        
+        same_position_groups = self.position_detector.detect_same_position_groups(
+            image_paths, json_paths
+        )
         
         # 处理同位置图像组
         same_position_images = set()

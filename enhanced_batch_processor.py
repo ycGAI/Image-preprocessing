@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from enhanced_image_processor import EnhancedImageProcessor
 from enhanced_file_utils import FileOperationType
-from report_generator import ReportGenerator
+from enhanced_report_generator import EnhancedReportGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -174,55 +174,34 @@ class EnhancedBatchProcessor:
         
     def generate_report(self):
         """生成处理报告"""
-        report_generator = ReportGenerator(self.output_root)
+        report_generator = EnhancedReportGenerator(self.output_root)
         
-        # 基础处理报告
-        processing_report = {
-            'processing_summary': {
-                'total_time_seconds': round(self.results['processing_time'], 2),
-                'total_folders': len(self.results['processed_folders']),
-                'total_images': self.results['total_images'],
-                'clean_images': self.results['clean_images'],
-                'dirty_images': self.results['dirty_images'],
-                'same_position_groups': self.results['same_position_groups'],
-                'error_count': len(self.results['errors']),
-                'processing_speed': round(
-                    self.results['total_images'] / self.results['processing_time'], 2
-                ) if self.results['processing_time'] > 0 else 0,
-                'clean_ratio': round(
-                    self.results['clean_images'] / self.results['total_images'], 3
-                ) if self.results['total_images'] > 0 else 0,
-                'file_operation': self.file_operation,
-                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        # 收集所有设置
+        settings = {
+            'file_operation': self.file_operation,
+            'sharpness_thresholds': self.processor.sharpness_classifier.get_thresholds(),
+            'exposure_thresholds': {
+                'overexposure_threshold': self.processor.exposure_analyzer.overexposure_threshold,
+                'underexposure_threshold': self.processor.exposure_analyzer.underexposure_threshold
             },
-            'dirty_reasons_distribution': self.results['dirty_reasons_summary'],
-            'folder_details': self.results['processed_folders'],
-            'classifier_settings': {
-                'sharpness_thresholds': self.processor.sharpness_classifier.get_thresholds(),
-                'exposure_thresholds': {
-                    'overexposure_threshold': self.processor.exposure_analyzer.overexposure_threshold,
-                    'underexposure_threshold': self.processor.exposure_analyzer.underexposure_threshold
-                },
-                'position_similarity_threshold': self.processor.position_detector.similarity_threshold,
-                'work_area_thresholds': {
-                    'green_threshold': self.processor.work_area_detector.green_threshold,
-                    'brown_threshold': self.processor.work_area_detector.brown_threshold,
-                    'min_valid_area': self.processor.work_area_detector.min_valid_area
-                }
-            },
-            'errors': self.results['errors']
+            'position_distance_threshold': self.processor.position_detector.gps_distance_threshold,
+            'position_rotation_threshold': self.processor.position_detector.rotation_threshold,
+            'work_area_thresholds': {
+                'green_threshold': self.processor.work_area_detector.green_threshold,
+                'brown_threshold': self.processor.work_area_detector.brown_threshold,
+                'min_valid_area': self.processor.work_area_detector.min_valid_area
+            }
         }
         
-        # 保存报告
-        report_path = self.output_root / 'enhanced_processing_report.json'
-        with open(report_path, 'w', encoding='utf-8') as f:
-            import json
-            json.dump(processing_report, f, ensure_ascii=False, indent=2)
-            
-        logger.info(f"处理报告已保存到: {report_path}")
+        # 生成报告
+        report = report_generator.generate_processing_report(
+            self.results, 
+            self.results.get('processing_time', 0),
+            settings
+        )
         
         # 打印摘要
-        self._print_summary(processing_report)
+        report_generator.print_summary(report)
         
         # 生成可视化报告
         try:
@@ -238,80 +217,5 @@ class EnhancedBatchProcessor:
                 logger.info(f"CSV文件已导出: {csv_path}")
         except Exception as e:
             logger.warning(f"导出CSV时出错: {e}")
-            
-    def _print_summary(self, report: Dict):
-        """打印处理摘要"""
-        summary = report['processing_summary']
-        print("\n" + "="*60)
-        print("增强图像处理摘要")
-        print("="*60)
-        print(f"处理时间: {summary['timestamp']}")
-        print(f"总耗时: {summary['total_time_seconds']} 秒")
-        print(f"文件操作类型: {self.processor.file_utils.get_operation_stats(self.file_operation)}")
-        print(f"处理文件夹数: {summary['total_folders']}")
-        print(f"总图像数: {summary['total_images']}")
-        print(f"干净数据: {summary['clean_images']} ({summary['clean_ratio']:.1%})")
-        print(f"脏数据: {summary['dirty_images']}")
-        print(f"同位置拍摄组数: {summary['same_position_groups']}")
-        
-        if report['dirty_reasons_distribution']:
-            print("\n脏数据原因分布:")
-            for reason, count in report['dirty_reasons_distribution'].items():
-                percentage = count / summary['dirty_images'] * 100 if summary['dirty_images'] > 0 else 0
-                reason_display = {
-                    'blurry': '模糊',
-                    'overexposed': '过曝',
-                    'underexposed': '欠曝',
-                    'out_of_work_area': '离开工作区域',
-                    'same_position_extra': '同位置重复拍摄'
-                }.get(reason, reason)
-                print(f"  - {reason_display}: {count} ({percentage:.1f}%)")
-                
-        print(f"\n错误数: {summary['error_count']}")
-        print(f"处理速度: {summary['processing_speed']} 图像/秒")
-        print("="*60)
-        
-    def preview_processing(self, max_folders: int = 3) -> Dict:
-        """预览处理结果
-        
-        Args:
-            max_folders: 最大预览文件夹数
-            
-        Returns:
-            预览结果
-        """
-        logger.info(f"开始预览处理（最多处理 {max_folders} 个文件夹）...")
-        
-        time_folders = self.find_time_folders()
-        preview_folders = time_folders[:max_folders]
-        
-        preview_results = {
-            'preview_folders': [],
-            'total_found_folders': len(time_folders),
-            'preview_folder_count': len(preview_folders)
-        }
-        
-        for folder in preview_folders:
-            pairs = self.processor.file_utils.find_image_json_pairs(folder)
-            
-            # 分析前几张图片
-            sample_size = min(5, len(pairs))
-            sample_analysis = []
-            
-            for i in range(sample_size):
-                img_path, _ = pairs[i]
-                analysis = self.processor.quality_analyzer.analyze_image(img_path)
-                sample_analysis.append({
-                    'image': img_path.name,
-                    'is_clean': analysis['is_clean'],
-                    'dirty_reasons': analysis.get('dirty_reasons', [])
-                })
-                
-            preview_results['preview_folders'].append({
-                'folder_name': folder.name,
-                'image_json_pairs': len(pairs),
-                'folder_path': str(folder),
-                'sample_analysis': sample_analysis
-            })
             
         return preview_results

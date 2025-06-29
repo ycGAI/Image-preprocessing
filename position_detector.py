@@ -1,4 +1,5 @@
-import cv2
+import json
+import math
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
@@ -8,312 +9,273 @@ logger = logging.getLogger(__name__)
 
 
 class PositionDetector:
-    """图像位置检测器
+    """基于GPS的位置检测器
     
-    用于检测图像是否在同一位置拍摄
+    使用JSON文件中的GPS位置信息判断图像是否在同一位置拍摄
     """
     
     def __init__(self,
-                 similarity_threshold: float = 0.95,
-                 feature_method: str = 'orb',
-                 max_features: int = 500,
-                 histogram_weight: float = 0.3,
-                 structural_weight: float = 0.7):
+                 gps_distance_threshold: float = 2.0,  # 米
+                 rotation_threshold: float = 0.1):      # 四元数差异阈值
         """初始化位置检测器
         
         Args:
-            similarity_threshold: 相似度阈值
-            feature_method: 特征检测方法 ('orb', 'sift', 'template')
-            max_features: 最大特征点数量
-            histogram_weight: 直方图相似度权重
-            structural_weight: 结构相似度权重
+            gps_distance_threshold: GPS距离阈值（米）
+            rotation_threshold: 旋转差异阈值
         """
-        self.similarity_threshold = similarity_threshold
-        self.feature_method = feature_method
-        self.max_features = max_features
-        self.histogram_weight = histogram_weight
-        self.structural_weight = structural_weight
-        
-        # 初始化特征检测器
-        if feature_method == 'orb':
-            self.detector = cv2.ORB_create(nfeatures=max_features)
-            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-        elif feature_method == 'sift':
-            self.detector = cv2.SIFT_create(nfeatures=max_features)
-            self.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-        else:
-            self.detector = None
-            self.matcher = None
+        self.gps_distance_threshold = gps_distance_threshold
+        self.rotation_threshold = rotation_threshold
             
-    def calculate_histogram_similarity(self, img1: np.ndarray, img2: np.ndarray) -> float:
-        """计算直方图相似度
+    def read_position_from_json(self, json_path: Path) -> Optional[Dict]:
+        """从JSON文件读取位置信息
         
         Args:
-            img1: 第一张图像
-            img2: 第二张图像
+            json_path: JSON文件路径
             
         Returns:
-            相似度分数 (0-1)
+            位置信息字典，包含translation和rotation
         """
-        # 转换为HSV空间
-        hsv1 = cv2.cvtColor(img1, cv2.COLOR_BGR2HSV)
-        hsv2 = cv2.cvtColor(img2, cv2.COLOR_BGR2HSV)
-        
-        # 计算直方图
-        hist1 = cv2.calcHist([hsv1], [0, 1], None, [50, 60], [0, 180, 0, 256])
-        hist2 = cv2.calcHist([hsv2], [0, 1], None, [50, 60], [0, 180, 0, 256])
-        
-        # 归一化
-        cv2.normalize(hist1, hist1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-        cv2.normalize(hist2, hist2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-        
-        # 计算相关性
-        correlation = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
-        
-        return correlation
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 提取transform信息
+            if 'transform' in data:
+                transform = data['transform']
+                if 'translation' in transform and 'rotation' in transform:
+                    return {
+                        'translation': transform['translation'],
+                        'rotation': transform['rotation'],
+                        'timestamp': data.get('header', {}).get('stamp', {})
+                    }
+            
+            # 检查是否是扁平结构（您提供的格式）
+            if 'transformtranslationx' in data:
+                translation = {
+                    'x': data.get('transformtranslationx'),
+                    'y': data.get('transformtranslationy'),
+                    'z': data.get('transformtranslationz', 0.5)
+                }
+                rotation = {
+                    'x': data.get('transformrotationx', 0),
+                    'y': data.get('transformrotationy', 0),
+                    'z': data.get('transformrotationz', 0),
+                    'w': data.get('transformrotationw', 1)
+                }
+                
+                return {
+                    'translation': translation,
+                    'rotation': rotation,
+                    'timestamp': {
+                        'sec': data.get('headerstampsec', 0),
+                        'nanosec': data.get('headerstampnanosec', 0)
+                    }
+                }
+            
+            logger.warning(f"无法从JSON文件提取位置信息: {json_path}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"读取JSON文件失败 {json_path}: {str(e)}")
+            return None
     
-    def calculate_ssim(self, img1: np.ndarray, img2: np.ndarray) -> float:
-        """计算结构相似性指数 (SSIM)
+    def calculate_gps_distance(self, pos1: Dict, pos2: Dict) -> float:
+        """计算两个GPS位置之间的欧氏距离
         
         Args:
-            img1: 第一张图像
-            img2: 第二张图像
+            pos1: 第一个位置的translation字典
+            pos2: 第二个位置的translation字典
             
         Returns:
-            SSIM分数 (0-1)
+            距离（米）
         """
-        # 确保图像大小相同
-        if img1.shape != img2.shape:
-            # 调整到相同大小
-            height = min(img1.shape[0], img2.shape[0])
-            width = min(img1.shape[1], img2.shape[1])
-            img1 = cv2.resize(img1, (width, height))
-            img2 = cv2.resize(img2, (width, height))
-            
-        # 转换为灰度图
-        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+        dx = pos1.get('x', 0) - pos2.get('x', 0)
+        dy = pos1.get('y', 0) - pos2.get('y', 0)
+        dz = pos1.get('z', 0) - pos2.get('z', 0)
         
-        # 计算SSIM
-        # 参数设置
-        C1 = (0.01 * 255) ** 2
-        C2 = (0.03 * 255) ** 2
-        
-        # 计算均值
-        mu1 = cv2.GaussianBlur(gray1, (11, 11), 1.5)
-        mu2 = cv2.GaussianBlur(gray2, (11, 11), 1.5)
-        
-        mu1_2 = mu1 ** 2
-        mu2_2 = mu2 ** 2
-        mu1_mu2 = mu1 * mu2
-        
-        # 计算方差和协方差
-        sigma1_2 = cv2.GaussianBlur(gray1 ** 2, (11, 11), 1.5) - mu1_2
-        sigma2_2 = cv2.GaussianBlur(gray2 ** 2, (11, 11), 1.5) - mu2_2
-        sigma12 = cv2.GaussianBlur(gray1 * gray2, (11, 11), 1.5) - mu1_mu2
-        
-        # 计算SSIM
-        ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / \
-                   ((mu1_2 + mu2_2 + C1) * (sigma1_2 + sigma2_2 + C2))
-        
-        return np.mean(ssim_map)
+        return math.sqrt(dx*dx + dy*dy + dz*dz)
     
-    def calculate_template_matching(self, img1: np.ndarray, img2: np.ndarray) -> float:
-        """使用模板匹配计算相似度
+    def calculate_rotation_difference(self, rot1: Dict, rot2: Dict) -> float:
+        """计算两个四元数旋转之间的差异
         
         Args:
-            img1: 第一张图像
-            img2: 第二张图像
+            rot1: 第一个旋转四元数
+            rot2: 第二个旋转四元数
             
         Returns:
-            匹配分数 (0-1)
+            旋转差异（0-1）
         """
-        # 确保图像大小相同
-        if img1.shape != img2.shape:
-            height = min(img1.shape[0], img2.shape[0])
-            width = min(img1.shape[1], img2.shape[1])
-            img1 = cv2.resize(img1, (width, height))
-            img2 = cv2.resize(img2, (width, height))
-            
-        # 转换为灰度图
-        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+        # 提取四元数分量
+        q1 = np.array([
+            rot1.get('x', 0), 
+            rot1.get('y', 0), 
+            rot1.get('z', 0), 
+            rot1.get('w', 1)
+        ])
+        q2 = np.array([
+            rot2.get('x', 0), 
+            rot2.get('y', 0), 
+            rot2.get('z', 0), 
+            rot2.get('w', 1)
+        ])
         
-        # 使用归一化相关系数匹配
-        result = cv2.matchTemplate(gray1, gray2, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+        # 归一化四元数
+        q1 = q1 / np.linalg.norm(q1)
+        q2 = q2 / np.linalg.norm(q2)
         
-        return max_val
+        # 计算四元数点积
+        dot_product = np.abs(np.dot(q1, q2))
+        
+        # 限制在[-1, 1]范围内
+        dot_product = np.clip(dot_product, -1.0, 1.0)
+        
+        # 计算角度差异
+        angle_diff = 2 * np.arccos(dot_product)
+        
+        # 归一化到[0, 1]
+        return angle_diff / np.pi
     
-    def calculate_feature_similarity(self, img1: np.ndarray, img2: np.ndarray) -> float:
-        """使用特征匹配计算相似度
+    def is_same_position(self, json_path1: Path, json_path2: Path) -> Tuple[bool, Dict[str, float]]:
+        """通过GPS信息判断是否在同一位置
         
         Args:
-            img1: 第一张图像
-            img2: 第二张图像
+            json_path1: 第一个JSON文件路径
+            json_path2: 第二个JSON文件路径
             
         Returns:
-            相似度分数 (0-1)
+            (是否同位置, 度量信息)
         """
-        if self.detector is None:
-            return 0.0
-            
-        # 转换为灰度图
-        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+        pos1 = self.read_position_from_json(json_path1)
+        pos2 = self.read_position_from_json(json_path2)
         
-        # 检测特征点
-        kp1, des1 = self.detector.detectAndCompute(gray1, None)
-        kp2, des2 = self.detector.detectAndCompute(gray2, None)
+        if pos1 is None or pos2 is None:
+            logger.warning("GPS数据不可用，无法判断位置")
+            return False, {'error': 'GPS data not available'}
         
-        if des1 is None or des2 is None or len(kp1) < 10 or len(kp2) < 10:
-            return 0.0
-            
-        # 匹配特征点
-        matches = self.matcher.match(des1, des2)
+        # 计算距离
+        distance = self.calculate_gps_distance(
+            pos1['translation'], 
+            pos2['translation']
+        )
         
-        # 计算匹配分数
-        if len(matches) == 0:
-            return 0.0
-            
-        # 按距离排序
-        matches = sorted(matches, key=lambda x: x.distance)
+        # 计算旋转差异
+        rotation_diff = self.calculate_rotation_difference(
+            pos1['rotation'], 
+            pos2['rotation']
+        )
         
-        # 计算好的匹配比例
-        good_matches = [m for m in matches if m.distance < 50]  # ORB距离阈值
+        # 判断是否在同一位置
+        is_same = (distance <= self.gps_distance_threshold and 
+                  rotation_diff <= self.rotation_threshold)
         
-        match_ratio = len(good_matches) / max(len(kp1), len(kp2))
+        metrics = {
+            'gps_distance': float(distance),
+            'rotation_difference': float(rotation_diff),
+            'distance_threshold': self.gps_distance_threshold,
+            'rotation_threshold': self.rotation_threshold,
+            'method': 'gps'
+        }
         
-        return min(1.0, match_ratio * 2)  # 缩放到0-1范围
+        return is_same, metrics
     
-    def compare_images(self, img1: np.ndarray, img2: np.ndarray) -> Tuple[float, Dict[str, float]]:
-        """比较两张图像的相似度
-        
-        Args:
-            img1: 第一张图像
-            img2: 第二张图像
-            
-        Returns:
-            (总相似度, 各项指标)
-        """
-        metrics = {}
-        
-        # 计算直方图相似度
-        hist_sim = self.calculate_histogram_similarity(img1, img2)
-        metrics['histogram_similarity'] = float(hist_sim)
-        
-        # 计算结构相似度
-        ssim = self.calculate_ssim(img1, img2)
-        metrics['ssim'] = float(ssim)
-        
-        # 根据选择的方法计算额外相似度
-        if self.feature_method == 'template':
-            template_sim = self.calculate_template_matching(img1, img2)
-            metrics['template_matching'] = float(template_sim)
-            structural_sim = template_sim
-        else:
-            feature_sim = self.calculate_feature_similarity(img1, img2)
-            metrics['feature_similarity'] = float(feature_sim)
-            structural_sim = (ssim + feature_sim) / 2
-            
-        # 计算加权总分
-        total_similarity = (self.histogram_weight * hist_sim + 
-                          self.structural_weight * structural_sim)
-        
-        metrics['total_similarity'] = float(total_similarity)
-        
-        return total_similarity, metrics
-    
-    def detect_same_position_groups(self, image_paths: List[Path], 
+    def detect_same_position_groups(self, 
+                                  image_paths: List[Path],
+                                  json_paths: List[Path],
                                   max_group_size: int = 10) -> List[List[Path]]:
-        """检测同一位置拍摄的图像组
+        """使用GPS信息检测同一位置拍摄的图像组
         
         Args:
             image_paths: 图像路径列表
-            max_group_size: 最大组大小（避免内存溢出）
+            json_paths: JSON路径列表
+            max_group_size: 最大组大小
             
         Returns:
             同位置图像组列表
         """
-        if len(image_paths) < 2:
+        if len(image_paths) != len(json_paths):
+            logger.error("图像路径和JSON路径数量不匹配")
             return []
             
-        # 按文件名排序（假设按时间顺序命名）
-        sorted_paths = sorted(image_paths)
+        if len(image_paths) < 2:
+            return []
         
+        # 读取所有位置信息
+        positions = []
+        valid_indices = []
+        
+        for i, (img_path, json_path) in enumerate(zip(image_paths, json_paths)):
+            pos = self.read_position_from_json(json_path)
+            if pos is not None:
+                positions.append(pos)
+                valid_indices.append(i)
+            else:
+                logger.warning(f"无法读取GPS信息: {json_path}")
+        
+        if len(valid_indices) < 2:
+            logger.warning("有效GPS数据不足，无法进行位置分组")
+            return []
+        
+        # 使用贪心算法分组
         groups = []
-        current_group = []
-        reference_image = None
+        used = set()
         
-        for i, img_path in enumerate(sorted_paths):
-            try:
-                # 读取当前图像
-                current_image = cv2.imread(str(img_path))
-                if current_image is None:
-                    logger.warning(f"无法读取图像: {img_path}")
-                    continue
-                    
-                # 缩小图像以加快处理速度
-                scale_factor = 0.5
-                current_image = cv2.resize(current_image, None, 
-                                         fx=scale_factor, fy=scale_factor)
-                
-                if reference_image is None or len(current_group) == 0:
-                    # 开始新组
-                    reference_image = current_image
-                    current_group = [img_path]
-                else:
-                    # 与参考图像比较
-                    similarity, _ = self.compare_images(reference_image, current_image)
-                    
-                    if similarity >= self.similarity_threshold:
-                        # 添加到当前组
-                        current_group.append(img_path)
-                        
-                        # 检查组大小限制
-                        if len(current_group) >= max_group_size:
-                            groups.append(current_group)
-                            current_group = []
-                            reference_image = None
-                    else:
-                        # 保存当前组并开始新组
-                        if len(current_group) > 1:
-                            groups.append(current_group)
-                        
-                        reference_image = current_image
-                        current_group = [img_path]
-                        
-            except Exception as e:
-                logger.error(f"处理图像 {img_path} 时出错: {str(e)}")
+        for i, idx_i in enumerate(valid_indices):
+            if i in used:
                 continue
                 
-        # 保存最后一组
-        if len(current_group) > 1:
-            groups.append(current_group)
+            current_group = [image_paths[idx_i]]
+            used.add(i)
             
+            # 查找与当前位置接近的所有图像
+            for j, idx_j in enumerate(valid_indices[i+1:], start=i+1):
+                if j in used:
+                    continue
+                
+                # 计算距离
+                distance = self.calculate_gps_distance(
+                    positions[i]['translation'],
+                    positions[j]['translation']
+                )
+                
+                # 计算旋转差异
+                rotation_diff = self.calculate_rotation_difference(
+                    positions[i]['rotation'],
+                    positions[j]['rotation']
+                )
+                
+                # 如果足够接近，加入组
+                if (distance <= self.gps_distance_threshold and 
+                    rotation_diff <= self.rotation_threshold):
+                    current_group.append(image_paths[idx_j])
+                    used.add(j)
+                    
+                    # 检查组大小限制
+                    if len(current_group) >= max_group_size:
+                        break
+            
+            # 只保存包含多张图片的组
+            if len(current_group) > 1:
+                groups.append(current_group)
+                logger.info(f"检测到同位置组：{len(current_group)}张图片")
+        
+        logger.info(f"总共检测到 {len(groups)} 个同位置组")
         return groups
     
-    def is_same_position(self, img1_path: Path, img2_path: Path) -> Tuple[bool, float]:
-        """判断两张图像是否在同一位置拍摄
+    def get_position_summary(self, json_path: Path) -> Optional[str]:
+        """获取位置信息摘要
         
         Args:
-            img1_path: 第一张图像路径
-            img2_path: 第二张图像路径
+            json_path: JSON文件路径
             
         Returns:
-            (是否同位置, 相似度分数)
+            位置信息字符串
         """
-        try:
-            img1 = cv2.imread(str(img1_path))
-            img2 = cv2.imread(str(img2_path))
+        pos = self.read_position_from_json(json_path)
+        if pos is None:
+            return None
             
-            if img1 is None or img2 is None:
-                return False, 0.0
-                
-            similarity, _ = self.compare_images(img1, img2)
-            
-            return similarity >= self.similarity_threshold, similarity
-            
-        except Exception as e:
-            logger.error(f"比较图像时出错: {str(e)}")
-            return False, 0.0
+        trans = pos['translation']
+        rot = pos['rotation']
+        
+        return (f"Position: ({trans['x']:.2f}, {trans['y']:.2f}, {trans['z']:.2f}), "
+                f"Rotation: (z={rot['z']:.3f}, w={rot['w']:.3f})")

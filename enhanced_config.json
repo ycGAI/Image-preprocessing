@@ -1,6 +1,6 @@
 {
-    "source_root": "/media/gyc/Backup Plus4/gyc/ATB_data/raw_data",
-    "output_root": "/media/gyc/Backup Plus4/gyc/ATB_data/enhanced_output",
+    "source_root": "/media/gyc/Backup Plus5/gyc/ATB_data/raw_data",
+    "output_root": "/media/gyc/Backup Plus5/gyc/ATB_data/enhanced_output",
     "file_operation": "copy",
     "classifier_params": {
         "laplacian_threshold": 100.0,
@@ -17,11 +17,8 @@
         "histogram_bins": 256
     },
     "position_params": {
-        "similarity_threshold": 0.95,
-        "feature_method": "orb",
-        "max_features": 500,
-        "histogram_weight": 0.3,
-        "structural_weight": 0.7
+        "gps_distance_threshold": 0.5,
+        "rotation_threshold": 0.1
     },
     "work_area_params": {
         "green_threshold": 0.15,
