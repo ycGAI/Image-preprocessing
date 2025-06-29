@@ -74,11 +74,9 @@ def create_default_config() -> Dict:
             "rotation_threshold": 0.1
         },
         "work_area_params": {
-            "green_threshold": 0.15,
-            "brown_threshold": 0.10,
-            "vegetation_index_threshold": 0.1,
-            "texture_threshold": 20.0,
-            "min_valid_area": 0.3
+            "grass_threshold": 0.5,          # 修改：草地判定阈值
+            "soil_min_threshold": 0.3,      # 修改：最小土壤比例
+            "green_max_threshold": 0.3       # 修改：工作区域最大绿色比例
         },
         "processing": {
             "max_workers": 4
@@ -150,7 +148,10 @@ def main():
     parser.add_argument('--underexposure-threshold', type=float, help='欠曝阈值')
     parser.add_argument('--gps-distance-threshold', type=float, help='GPS距离阈值（米）')
     parser.add_argument('--rotation-threshold', type=float, help='旋转差异阈值')
-    parser.add_argument('--green-threshold', type=float, help='绿色植被阈值')
+    parser.add_argument('--grass-threshold', type=float, help='草地判定阈值（0-1）')
+    parser.add_argument('--soil-threshold', type=float, help='土壤最小比例阈值（0-1）')
+    parser.add_argument('--work-area-green-max', type=float, help='工作区域最大绿色比例（0-1）')
+
     
     args = parser.parse_args()
     
@@ -191,8 +192,12 @@ def main():
         config['position_params']['gps_distance_threshold'] = args.gps_distance_threshold
     if args.rotation_threshold:
         config['position_params']['rotation_threshold'] = args.rotation_threshold
-    if args.green_threshold:
-        config['work_area_params']['green_threshold'] = args.green_threshold
+    if args.grass_threshold:
+        config['work_area_params']['grass_threshold'] = args.grass_threshold
+    if args.soil_threshold:
+        config['work_area_params']['soil_min_threshold'] = args.soil_threshold
+    if args.work_area_green_max:
+        config['work_area_params']['green_max_threshold'] = args.work_area_green_max
     
     config['logging']['level'] = args.log_level
     

@@ -187,9 +187,9 @@ class EnhancedBatchProcessor:
             'position_distance_threshold': self.processor.position_detector.gps_distance_threshold,
             'position_rotation_threshold': self.processor.position_detector.rotation_threshold,
             'work_area_thresholds': {
-                'green_threshold': self.processor.work_area_detector.green_threshold,
-                'brown_threshold': self.processor.work_area_detector.brown_threshold,
-                'min_valid_area': self.processor.work_area_detector.min_valid_area
+                'grass_threshold': self.processor.work_area_detector.grass_threshold,
+                'soil_min_threshold': self.processor.work_area_detector.soil_min_threshold,
+                'green_max_threshold': self.processor.work_area_detector.green_max_threshold
             }
         }
         

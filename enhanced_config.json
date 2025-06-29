@@ -3,32 +3,30 @@
     "output_root": "/media/gyc/Backup Plus5/gyc/ATB_data/enhanced_output",
     "file_operation": "copy",
     "classifier_params": {
-        "laplacian_threshold": 100.0,
-        "sobel_threshold": 50.0,
-        "brenner_threshold": 1000.0,
-        "tenengrad_threshold": 500.0,
-        "variance_threshold": 50.0
+      "laplacian_threshold": 250,
+      "sobel_threshold": 2500,
+      "brenner_threshold": 100817012.06,
+      "tenengrad_threshold": 4063570855.03,
+      "variance_threshold": 50.0
     },
     "exposure_params": {
-        "overexposure_threshold": 0.05,
-        "underexposure_threshold": 0.05,
-        "bright_pixel_threshold": 240,
-        "dark_pixel_threshold": 15,
+        "overexposure_threshold": 0.4,
+        "underexposure_threshold": 0.4,
+        "bright_pixel_threshold": 350,
+        "dark_pixel_threshold": 30,
         "histogram_bins": 256
     },
     "position_params": {
-        "gps_distance_threshold": 0.5,
-        "rotation_threshold": 0.1
+        "gps_distance_threshold": 0.05,
+        "rotation_threshold": 0.05
     },
     "work_area_params": {
-        "green_threshold": 0.15,
-        "brown_threshold": 0.10,
-        "vegetation_index_threshold": 0.1,
-        "texture_threshold": 20.0,
-        "min_valid_area": 0.3
+        "grass_threshold": 0.5,
+        "soil_min_threshold": 0.1,
+        "green_max_threshold": 0.6
     },
     "processing": {
-        "max_workers": 4,
+        "max_workers": 16,
         "supported_formats": [
             ".jpg",
             ".jpeg",
