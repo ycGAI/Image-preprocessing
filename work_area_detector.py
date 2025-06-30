@@ -7,10 +7,10 @@ logger = logging.getLogger(__name__)
 
 
 class WorkAreaDetector:
-    """Work area detector - Simplified version
+    """Work area detector - Improved version
     
     Determination by color:
-    - Work area: Mostly soil (brown/dark), with minimal plants
+    - Work area: Mostly soil (brown/gray/dark), with minimal plants
     - Non-work area: Mostly grass (green)
     """
     
@@ -30,7 +30,7 @@ class WorkAreaDetector:
         self.green_max_threshold = green_max_threshold
     
     def detect_green_grass(self, image: np.ndarray) -> Tuple[float, np.ndarray]:
-        """Detect green grass areas
+        """Detect green grass areas with expanded range
         
         Args:
             image: Input image (BGR format)
@@ -41,13 +41,39 @@ class WorkAreaDetector:
         # Convert to HSV space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # Define grass green range (relatively broad)
-        # Grass green is usually quite bright
-        lower_green = np.array([25, 30, 30])    # Hue 25-85 covers various greens
-        upper_green = np.array([85, 255, 255])
+        # Define multiple green ranges to catch different types of grass
+        masks = []
         
-        # Create green mask
-        mask_green = cv2.inRange(hsv, lower_green, upper_green)
+        # Range 1: Standard green grass (broader hue range)
+        lower_green1 = np.array([25, 20, 30])    # Hue: 25-90 (includes yellow-green to blue-green)
+        upper_green1 = np.array([90, 255, 255])  # Full saturation and brightness range
+        mask1 = cv2.inRange(hsv, lower_green1, upper_green1)
+        masks.append(mask1)
+        
+        # Range 2: Low saturation green (for overexposed/washed out grass)
+        lower_green2 = np.array([25, 10, 100])   # Very low saturation, high brightness
+        upper_green2 = np.array([90, 80, 255])   # Medium saturation, full brightness
+        mask2 = cv2.inRange(hsv, lower_green2, upper_green2)
+        masks.append(mask2)
+        
+        # Range 3: Dark/shadowed grass
+        lower_green3 = np.array([25, 15, 15])    # Low brightness
+        upper_green3 = np.array([90, 255, 80])   # Low to medium brightness
+        mask3 = cv2.inRange(hsv, lower_green3, upper_green3)
+        masks.append(mask3)
+        
+        # Combine all masks
+        mask_green = masks[0]
+        for mask in masks[1:]:
+            mask_green = cv2.bitwise_or(mask_green, mask)
+        
+        # Lighter validation for green channel dominance
+        b, g, r = cv2.split(image)
+        # Green should be at least slightly stronger than red OR blue
+        green_dominance_mask = ((g > r * 1.05) | (g > b * 1.05)) & (g > 30)
+        
+        # Apply green dominance check
+        mask_green = cv2.bitwise_and(mask_green, green_dominance_mask.astype(np.uint8) * 255)
         
         # Morphological operations for noise removal
         kernel = np.ones((5, 5), np.uint8)
@@ -59,8 +85,8 @@ class WorkAreaDetector:
         
         return float(green_ratio), mask_green
     
-    def detect_soil(self, image: np.ndarray) -> Tuple[float, np.ndarray]:
-        """Detect soil areas (brown and dark areas)
+    def detect_soil_improved(self, image: np.ndarray) -> Tuple[float, np.ndarray]:
+        """Improved soil detection for various soil types
         
         Args:
             image: Input image (BGR format)
@@ -68,48 +94,84 @@ class WorkAreaDetector:
         Returns:
             (soil area ratio, soil mask)
         """
-        # Convert to HSV space
+        # Convert to HSV and LAB spaces for better color detection
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         
-        # Define multiple soil color ranges
-        masks = []
+        # Initialize empty mask
+        total_mask = np.zeros(image.shape[:2], dtype=np.uint8)
         
-        # 1. Brown soil (hue 10-25)
-        lower_brown = np.array([10, 20, 20])
-        upper_brown = np.array([25, 255, 180])
-        mask_brown = cv2.inRange(hsv, lower_brown, upper_brown)
-        masks.append(mask_brown)
+        # Method 1: Brown soil detection (expanded range)
+        # Brown hues: 10-30, with varying saturation and value
+        brown_masks = []
+        # Light brown
+        brown_masks.append(cv2.inRange(hsv, np.array([10, 10, 60]), np.array([30, 180, 200])))
+        # Dark brown
+        brown_masks.append(cv2.inRange(hsv, np.array([10, 20, 20]), np.array([25, 255, 100])))
+        # Reddish brown
+        brown_masks.append(cv2.inRange(hsv, np.array([0, 20, 20]), np.array([15, 180, 150])))
         
-        # 2. Dark soil (low brightness)
-        lower_dark = np.array([0, 0, 0])
-        upper_dark = np.array([180, 255, 80])  # Brightness < 80
-        mask_dark = cv2.inRange(hsv, lower_dark, upper_dark)
-        masks.append(mask_dark)
+        for mask in brown_masks:
+            total_mask = cv2.bitwise_or(total_mask, mask)
         
-        # 3. Gray soil (low saturation)
-        lower_gray = np.array([0, 0, 40])
-        upper_gray = np.array([180, 30, 120])  # Saturation < 30
-        mask_gray = cv2.inRange(hsv, lower_gray, upper_gray)
-        masks.append(mask_gray)
+        # Method 2: Gray/neutral soil (low saturation)
+        # For your image, this is crucial - many soils appear grayish
+        gray_mask = cv2.inRange(hsv, np.array([0, 0, 30]), np.array([180, 40, 180]))
+        total_mask = cv2.bitwise_or(total_mask, gray_mask)
         
-        # Merge all soil masks
-        mask_soil = masks[0]
-        for mask in masks[1:]:
-            mask_soil = cv2.bitwise_or(mask_soil, mask)
+        # Method 3: Dark soil detection (low value)
+        dark_mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 255, 90]))
+        total_mask = cv2.bitwise_or(total_mask, dark_mask)
         
-        # Remove overlapping green parts
-        _, mask_green = self.detect_green_grass(image)
-        mask_soil = cv2.bitwise_and(mask_soil, cv2.bitwise_not(mask_green))
+        # Method 4: LAB color space detection
+        # In LAB space, soil usually has:
+        # - L (lightness): 20-70
+        # - a (green-red): -10 to +20 (slightly towards red)
+        # - b (blue-yellow): 0 to +30 (slightly towards yellow)
+        lab_soil_mask = cv2.inRange(lab, np.array([20, 118, 128]), np.array([70, 138, 158]))
+        total_mask = cv2.bitwise_or(total_mask, lab_soil_mask)
         
-        # Morphological operations
-        kernel = np.ones((5, 5), np.uint8)
-        mask_soil = cv2.morphologyEx(mask_soil, cv2.MORPH_OPEN, kernel)
-        mask_soil = cv2.morphologyEx(mask_soil, cv2.MORPH_CLOSE, kernel)
+        # Method 5: Texture-based approach
+        # Soil often has uniform texture, unlike grass which has more variation
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Calculate local standard deviation
+        kernel_size = 5
+        mean = cv2.blur(gray, (kernel_size, kernel_size))
+        mean_sq = cv2.blur(gray**2, (kernel_size, kernel_size))
+        std_dev = np.sqrt(mean_sq - mean**2)
+        
+        # Low texture variation areas (likely soil)
+        low_texture_mask = (std_dev < 15).astype(np.uint8) * 255
+        
+        # Combine with color-based detection
+        total_mask = cv2.bitwise_or(total_mask, low_texture_mask)
+        
+        # Remove green areas (definitely not soil)
+        _, green_mask = self.detect_green_grass(image)
+        total_mask = cv2.bitwise_and(total_mask, cv2.bitwise_not(green_mask))
+        
+        # Morphological operations to clean up
+        kernel = np.ones((7, 7), np.uint8)
+        total_mask = cv2.morphologyEx(total_mask, cv2.MORPH_CLOSE, kernel)
+        total_mask = cv2.morphologyEx(total_mask, cv2.MORPH_OPEN, kernel)
         
         # Calculate soil area ratio
-        soil_ratio = np.sum(mask_soil > 0) / (image.shape[0] * image.shape[1])
+        soil_ratio = np.sum(total_mask > 0) / (image.shape[0] * image.shape[1])
         
-        return float(soil_ratio), mask_soil
+        return float(soil_ratio), total_mask
+    
+    def detect_soil(self, image: np.ndarray) -> Tuple[float, np.ndarray]:
+        """Original soil detection method (kept for compatibility)
+        
+        Args:
+            image: Input image (BGR format)
+            
+        Returns:
+            (soil area ratio, soil mask)
+        """
+        # Use the improved method
+        return self.detect_soil_improved(image)
     
     def is_in_work_area(self, image: np.ndarray) -> Tuple[bool, Dict[str, float]]:
         """Determine if image is in work area
@@ -128,8 +190,8 @@ class WorkAreaDetector:
         # Detect green grass
         green_ratio, green_mask = self.detect_green_grass(image)
         
-        # Detect soil
-        soil_ratio, soil_mask = self.detect_soil(image)
+        # Detect soil using improved method
+        soil_ratio, soil_mask = self.detect_soil_improved(image)
         
         # Calculate other areas (may be sky, road, etc.)
         other_ratio = 1.0 - green_ratio - soil_ratio
@@ -156,13 +218,13 @@ class WorkAreaDetector:
             in_work_area = True
             # This is typical work area
         
-        # Rule 3: Too little soil
-        elif soil_ratio < 0.1:
+        # Rule 3: Too little soil (lowered threshold for better detection)
+        elif soil_ratio < 0.05:  # Changed from 0.1 to 0.05
             in_work_area = False
             reasons.append(f"insufficient_soil ({soil_ratio:.1%})")
         
-        # Rule 4: Both green and soil are minimal, may be other areas (sky, buildings, etc.)
-        elif green_ratio < 0.1 and soil_ratio < 0.2:
+        # Rule 4: Both green and soil are minimal, may be other areas
+        elif green_ratio < 0.1 and soil_ratio < 0.15:  # Changed from 0.2 to 0.15
             in_work_area = False
             reasons.append("not_farmland")
         
@@ -182,7 +244,7 @@ class WorkAreaDetector:
         """
         # Detect each area
         green_ratio, green_mask = self.detect_green_grass(image)
-        soil_ratio, soil_mask = self.detect_soil(image)
+        soil_ratio, soil_mask = self.detect_soil_improved(image)
         
         # Create color mask
         result = image.copy()

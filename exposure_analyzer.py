@@ -13,9 +13,9 @@ class ExposureAnalyzer:
     """
     
     def __init__(self,
-                 overexposure_threshold: float = 0.05,
+                 overexposure_threshold: float = 0.05,  # Back to original
                  underexposure_threshold: float = 0.05,
-                 bright_pixel_threshold: int = 240,
+                 bright_pixel_threshold: int = 240,     # Back to original
                  dark_pixel_threshold: int = 15,
                  histogram_bins: int = 256):
         """Initialize exposure analyzer
@@ -34,7 +34,7 @@ class ExposureAnalyzer:
         self.histogram_bins = histogram_bins
         
     def analyze_exposure(self, image: np.ndarray) -> Tuple[str, Dict[str, float]]:
-        """Analyze image exposure status
+        """Analyze image exposure status with balanced overexposure detection
         
         Args:
             image: Input image (BGR format)
@@ -64,6 +64,26 @@ class ExposureAnalyzer:
         mean_brightness = np.mean(gray)
         std_brightness = np.std(gray)
         
+        # Calculate highlight clipping in color channels
+        highlight_clipping_ratio = 0.0
+        if len(image.shape) == 3:
+            # Check each color channel for clipping
+            for i in range(3):
+                channel = image[:, :, i]
+                clipped_pixels = np.sum(channel >= 250) / channel.size
+                highlight_clipping_ratio = max(highlight_clipping_ratio, clipped_pixels)
+        
+        # Calculate percentile brightness
+        percentile_95 = np.percentile(gray, 95)
+        percentile_99 = np.percentile(gray, 99)
+        
+        # Detect washed-out appearance (low contrast in bright areas)
+        bright_region_mask = gray > 200
+        if np.sum(bright_region_mask) > 0:
+            bright_region_std = np.std(gray[bright_region_mask])
+        else:
+            bright_region_std = std_brightness
+            
         # Calculate brightness distribution skewness
         hist_normalized = hist.flatten() / total_pixels
         bins = np.arange(self.histogram_bins)
@@ -72,16 +92,39 @@ class ExposureAnalyzer:
         # Third central moment (skewness)
         skewness = np.sum(((bins - mean_bin) ** 3) * hist_normalized)
         
-        # Determine exposure status
+        # Balanced exposure status determination
         exposure_status = 'normal'
         
-        if bright_ratio > self.overexposure_threshold:
+        # Multiple criteria for overexposure (more balanced scoring)
+        overexposure_score = 0
+        
+        if bright_ratio > self.overexposure_threshold * 2:  
+            overexposure_score += 2
+        elif bright_ratio > self.overexposure_threshold:
+            overexposure_score += 1
+            
+        if mean_brightness > 175:  # Lowered to catch the second image
+            overexposure_score += 2  # Increased weight
+        elif mean_brightness > 165:
+            overexposure_score += 1
+            
+        if percentile_95 > 250:    
+            overexposure_score += 1
+        if percentile_99 >= 255:   # Changed to >= 255 (saturated)
+            overexposure_score += 1
+        if highlight_clipping_ratio > 0.12:  # Lowered to 0.12
+            overexposure_score += 1
+        if bright_region_std < 20:  # Raised to 20
+            overexposure_score += 1
+        if std_brightness < 50 and mean_brightness > 170:  # Adjusted for second image
+            overexposure_score += 1
+            
+        # Determine status based on score
+        if overexposure_score >= 5:  
             exposure_status = 'overexposed'
         elif dark_ratio > self.underexposure_threshold:
             exposure_status = 'underexposed'
-        elif mean_brightness > 220:  # Overall too bright
-            exposure_status = 'overexposed'
-        elif mean_brightness < 35:   # Overall too dark
+        elif mean_brightness < 35:
             exposure_status = 'underexposed'
             
         metrics = {
@@ -90,7 +133,13 @@ class ExposureAnalyzer:
             'mean_brightness': float(mean_brightness),
             'std_brightness': float(std_brightness),
             'brightness_skewness': float(skewness),
-            'exposure_status': exposure_status
+            'exposure_status': exposure_status,
+            # New metrics
+            'overexposure_score': overexposure_score,
+            'percentile_95': float(percentile_95),
+            'percentile_99': float(percentile_99),
+            'highlight_clipping_ratio': float(highlight_clipping_ratio),
+            'bright_region_std': float(bright_region_std)
         }
         
         return exposure_status, metrics
@@ -119,12 +168,20 @@ class ExposureAnalyzer:
         # Low saturation with high brightness may indicate overexposure
         low_saturation_ratio = np.sum((s < 30) & (v > 220)) / (v.shape[0] * v.shape[1])
         
+        # Additional metric: saturation loss in bright areas
+        bright_mask = v > 200
+        if np.sum(bright_mask) > 0:
+            bright_area_saturation = np.mean(s[bright_mask])
+        else:
+            bright_area_saturation = s_mean
+            
         return {
             'v_channel_mean': float(v_mean),
             'v_channel_std': float(v_std),
             's_channel_mean': float(s_mean),
             's_channel_std': float(s_std),
-            'low_saturation_bright_ratio': float(low_saturation_ratio)
+            'low_saturation_bright_ratio': float(low_saturation_ratio),
+            'bright_area_saturation': float(bright_area_saturation)
         }
     
     def detect_clipping(self, image: np.ndarray) -> Dict[str, float]:
@@ -188,5 +245,21 @@ class ExposureAnalyzer:
         score -= metrics['bright_pixel_ratio'] * 2
         score -= metrics['dark_pixel_ratio'] * 2
         
+        # Deduct points for clipping
+        score -= metrics.get('highlight_clipping_ratio', 0) * 2
+        
         # Limit to 0-1 range
         return max(0.0, min(1.0, score))
+    
+    def is_severely_overexposed(self, image: np.ndarray) -> bool:
+        """Check if image is severely overexposed
+        
+        Args:
+            image: Input image
+            
+        Returns:
+            True if severely overexposed
+        """
+        _, metrics = self.analyze_exposure(image)
+        # Raised threshold from 6 to 7 for severe overexposure
+        return metrics.get('overexposure_score', 0) >= 7

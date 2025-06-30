@@ -1,4 +1,3 @@
-import cv2
 import json
 import time
 from pathlib import Path
@@ -10,6 +9,7 @@ from exposure_analyzer import ExposureAnalyzer
 from position_detector import PositionDetector
 from work_area_detector import WorkAreaDetector
 from enhanced_file_utils import EnhancedFileUtils, FileOperationType
+import cv2
 
 logger = logging.getLogger(__name__)
 
@@ -55,16 +55,7 @@ class ImageQualityAnalyzer:
                 'metrics': {}
             }
             
-            # 1. Sharpness analysis
-            sharpness_class, sharpness_metrics = self.sharpness_classifier.classify_with_ensemble(image)
-            result['metrics']['sharpness'] = sharpness_metrics
-            result['sharpness_classification'] = sharpness_class
-            
-            if sharpness_class == "blurry":
-                result['is_clean'] = False
-                result['dirty_reasons'].append('blurry')
-                
-            # 2. Exposure analysis
+            # 1. Exposure analysis (do this first)
             exposure_status, exposure_metrics = self.exposure_analyzer.analyze_exposure(image)
             result['metrics']['exposure'] = exposure_metrics
             result['exposure_status'] = exposure_status
@@ -76,14 +67,42 @@ class ImageQualityAnalyzer:
                 result['is_clean'] = False
                 result['dirty_reasons'].append('underexposed')
                 
-            # 3. Work area detection
-            in_work_area, work_area_metrics = self.work_area_detector.is_in_work_area(image)
-            result['metrics']['work_area'] = work_area_metrics
-            result['in_work_area'] = in_work_area
+            # 2. Sharpness analysis
+            sharpness_class, sharpness_metrics = self.sharpness_classifier.classify_with_ensemble(image)
+            result['metrics']['sharpness'] = sharpness_metrics
+            result['sharpness_classification'] = sharpness_class
             
-            if not in_work_area:
+            if sharpness_class == "blurry":
                 result['is_clean'] = False
-                result['dirty_reasons'].append('out_of_work_area')
+                result['dirty_reasons'].append('blurry')
+                
+            # 3. Work area detection
+            # Check if severely overexposed
+            is_severely_overexposed = exposure_metrics.get('overexposure_score', 0) >= 7  # Raised from 6
+            
+            if is_severely_overexposed:
+                # For severely overexposed images, skip work area detection
+                result['in_work_area'] = True
+                result['metrics']['work_area'] = {
+                    'green_ratio': 0.0,
+                    'soil_ratio': 0.0,
+                    'other_ratio': 1.0,
+                    'note': 'Skipped due to severe overexposure'
+                }
+            else:
+                in_work_area, work_area_metrics = self.work_area_detector.is_in_work_area(image)
+                result['metrics']['work_area'] = work_area_metrics
+                result['in_work_area'] = in_work_area
+                
+                if not in_work_area:
+                    # Check if this might be a false positive due to overexposure
+                    if exposure_status == 'overexposed' and 'too_much_green' in str(work_area_metrics.get('reasons', [])):
+                        # Don't mark as dirty if overexposed and detected as green
+                        result['metrics']['work_area']['note'] = 'Uncertain due to overexposure'
+                        result['in_work_area'] = True  # Give benefit of doubt
+                    else:
+                        result['is_clean'] = False
+                        result['dirty_reasons'].append('out_of_work_area')
                 
             return result
             

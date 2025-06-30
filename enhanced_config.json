@@ -1,6 +1,6 @@
 {
-    "source_root": "/media/gyc/Backup Plus6/gyc/ATB_data/demo_test_data",
-    "output_root": "/media/gyc/Backup Plus6/gyc/ATB_data/enhanced_output_demo_test_data",
+    "source_root": "/media/gyc/Backup Plus6/gyc/ATB_data/raw_data",
+    "output_root": "/media/gyc/Backup Plus6/gyc/ATB_data/output",
     "file_operation": "copy",
     "classifier_params": {
       "laplacian_threshold": 250,
@@ -10,20 +10,20 @@
       "variance_threshold": 50.0
     },
     "exposure_params": {
-        "overexposure_threshold": 0.4,
-        "underexposure_threshold": 0.4,
-        "bright_pixel_threshold": 350,
-        "dark_pixel_threshold": 30,
+        "overexposure_threshold": 0.05,
+        "underexposure_threshold": 0.05,
+        "bright_pixel_threshold": 240,
+        "dark_pixel_threshold": 15,
         "histogram_bins": 256
     },
     "position_params": {
-        "gps_distance_threshold": 0.05,
-        "rotation_threshold": 0.05
+        "gps_distance_threshold": 0.005,
+        "rotation_threshold": 0.01
     },
     "work_area_params": {
         "grass_threshold": 0.5,
-        "soil_min_threshold": 0.1,
-        "green_max_threshold": 0.6
+        "soil_min_threshold": 0.2,
+        "green_max_threshold": 0.4
     },
     "processing": {
         "max_workers": 16,
