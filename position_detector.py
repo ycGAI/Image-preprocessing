@@ -9,37 +9,37 @@ logger = logging.getLogger(__name__)
 
 
 class PositionDetector:
-    """基于GPS的位置检测器
+    """GPS-based position detector
     
-    使用JSON文件中的GPS位置信息判断图像是否在同一位置拍摄
+    Uses GPS position information from JSON files to determine if images were taken at the same location
     """
     
     def __init__(self,
-                 gps_distance_threshold: float = 2.0,  # 米
-                 rotation_threshold: float = 0.1):      # 四元数差异阈值
-        """初始化位置检测器
+                 gps_distance_threshold: float = 2.0,  # meters
+                 rotation_threshold: float = 0.1):      # quaternion difference threshold
+        """Initialize position detector
         
         Args:
-            gps_distance_threshold: GPS距离阈值（米）
-            rotation_threshold: 旋转差异阈值
+            gps_distance_threshold: GPS distance threshold (meters)
+            rotation_threshold: Rotation difference threshold
         """
         self.gps_distance_threshold = gps_distance_threshold
         self.rotation_threshold = rotation_threshold
             
     def read_position_from_json(self, json_path: Path) -> Optional[Dict]:
-        """从JSON文件读取位置信息
+        """Read position information from JSON file
         
         Args:
-            json_path: JSON文件路径
+            json_path: JSON file path
             
         Returns:
-            位置信息字典，包含translation和rotation
+            Position information dictionary containing translation and rotation
         """
         try:
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # 提取transform信息
+            # Extract transform information
             if 'transform' in data:
                 transform = data['transform']
                 if 'translation' in transform and 'rotation' in transform:
@@ -49,7 +49,7 @@ class PositionDetector:
                         'timestamp': data.get('header', {}).get('stamp', {})
                     }
             
-            # 检查是否是扁平结构（您提供的格式）
+            # Check if it's a flat structure (format you provided)
             if 'transformtranslationx' in data:
                 translation = {
                     'x': data.get('transformtranslationx'),
@@ -72,22 +72,22 @@ class PositionDetector:
                     }
                 }
             
-            logger.warning(f"无法从JSON文件提取位置信息: {json_path}")
+            logger.warning(f"Cannot extract position information from JSON file: {json_path}")
             return None
             
         except Exception as e:
-            logger.error(f"读取JSON文件失败 {json_path}: {str(e)}")
+            logger.error(f"Failed to read JSON file {json_path}: {str(e)}")
             return None
     
     def calculate_gps_distance(self, pos1: Dict, pos2: Dict) -> float:
-        """计算两个GPS位置之间的欧氏距离
+        """Calculate Euclidean distance between two GPS positions
         
         Args:
-            pos1: 第一个位置的translation字典
-            pos2: 第二个位置的translation字典
+            pos1: First position's translation dictionary
+            pos2: Second position's translation dictionary
             
         Returns:
-            距离（米）
+            Distance (meters)
         """
         dx = pos1.get('x', 0) - pos2.get('x', 0)
         dy = pos1.get('y', 0) - pos2.get('y', 0)
@@ -96,16 +96,16 @@ class PositionDetector:
         return math.sqrt(dx*dx + dy*dy + dz*dz)
     
     def calculate_rotation_difference(self, rot1: Dict, rot2: Dict) -> float:
-        """计算两个四元数旋转之间的差异
+        """Calculate difference between two quaternion rotations
         
         Args:
-            rot1: 第一个旋转四元数
-            rot2: 第二个旋转四元数
+            rot1: First rotation quaternion
+            rot2: Second rotation quaternion
             
         Returns:
-            旋转差异（0-1）
+            Rotation difference (0-1)
         """
-        # 提取四元数分量
+        # Extract quaternion components
         q1 = np.array([
             rot1.get('x', 0), 
             rot1.get('y', 0), 
@@ -119,52 +119,52 @@ class PositionDetector:
             rot2.get('w', 1)
         ])
         
-        # 归一化四元数
+        # Normalize quaternions
         q1 = q1 / np.linalg.norm(q1)
         q2 = q2 / np.linalg.norm(q2)
         
-        # 计算四元数点积
+        # Calculate quaternion dot product
         dot_product = np.abs(np.dot(q1, q2))
         
-        # 限制在[-1, 1]范围内
+        # Limit to [-1, 1] range
         dot_product = np.clip(dot_product, -1.0, 1.0)
         
-        # 计算角度差异
+        # Calculate angle difference
         angle_diff = 2 * np.arccos(dot_product)
         
-        # 归一化到[0, 1]
+        # Normalize to [0, 1]
         return angle_diff / np.pi
     
     def is_same_position(self, json_path1: Path, json_path2: Path) -> Tuple[bool, Dict[str, float]]:
-        """通过GPS信息判断是否在同一位置
+        """Determine if at the same position using GPS information
         
         Args:
-            json_path1: 第一个JSON文件路径
-            json_path2: 第二个JSON文件路径
+            json_path1: First JSON file path
+            json_path2: Second JSON file path
             
         Returns:
-            (是否同位置, 度量信息)
+            (Is same position, metrics)
         """
         pos1 = self.read_position_from_json(json_path1)
         pos2 = self.read_position_from_json(json_path2)
         
         if pos1 is None or pos2 is None:
-            logger.warning("GPS数据不可用，无法判断位置")
+            logger.warning("GPS data not available, cannot determine position")
             return False, {'error': 'GPS data not available'}
         
-        # 计算距离
+        # Calculate distance
         distance = self.calculate_gps_distance(
             pos1['translation'], 
             pos2['translation']
         )
         
-        # 计算旋转差异
+        # Calculate rotation difference
         rotation_diff = self.calculate_rotation_difference(
             pos1['rotation'], 
             pos2['rotation']
         )
         
-        # 判断是否在同一位置
+        # Determine if at same position
         is_same = (distance <= self.gps_distance_threshold and 
                   rotation_diff <= self.rotation_threshold)
         
@@ -182,24 +182,24 @@ class PositionDetector:
                                   image_paths: List[Path],
                                   json_paths: List[Path],
                                   max_group_size: int = 10) -> List[List[Path]]:
-        """使用GPS信息检测同一位置拍摄的图像组
+        """Detect groups of images taken at the same position using GPS information
         
         Args:
-            image_paths: 图像路径列表
-            json_paths: JSON路径列表
-            max_group_size: 最大组大小
+            image_paths: List of image paths
+            json_paths: List of JSON paths
+            max_group_size: Maximum group size
             
         Returns:
-            同位置图像组列表
+            List of same position image groups
         """
         if len(image_paths) != len(json_paths):
-            logger.error("图像路径和JSON路径数量不匹配")
+            logger.error("Number of image paths and JSON paths don't match")
             return []
             
         if len(image_paths) < 2:
             return []
         
-        # 读取所有位置信息
+        # Read all position information
         positions = []
         valid_indices = []
         
@@ -209,13 +209,13 @@ class PositionDetector:
                 positions.append(pos)
                 valid_indices.append(i)
             else:
-                logger.warning(f"无法读取GPS信息: {json_path}")
+                logger.warning(f"Cannot read GPS information: {json_path}")
         
         if len(valid_indices) < 2:
-            logger.warning("有效GPS数据不足，无法进行位置分组")
+            logger.warning("Insufficient valid GPS data, cannot perform position grouping")
             return []
         
-        # 使用贪心算法分组
+        # Use greedy algorithm for grouping
         groups = []
         used = set()
         
@@ -226,49 +226,49 @@ class PositionDetector:
             current_group = [image_paths[idx_i]]
             used.add(i)
             
-            # 查找与当前位置接近的所有图像
+            # Find all images close to current position
             for j, idx_j in enumerate(valid_indices[i+1:], start=i+1):
                 if j in used:
                     continue
                 
-                # 计算距离
+                # Calculate distance
                 distance = self.calculate_gps_distance(
                     positions[i]['translation'],
                     positions[j]['translation']
                 )
                 
-                # 计算旋转差异
+                # Calculate rotation difference
                 rotation_diff = self.calculate_rotation_difference(
                     positions[i]['rotation'],
                     positions[j]['rotation']
                 )
                 
-                # 如果足够接近，加入组
+                # If close enough, add to group
                 if (distance <= self.gps_distance_threshold and 
                     rotation_diff <= self.rotation_threshold):
                     current_group.append(image_paths[idx_j])
                     used.add(j)
                     
-                    # 检查组大小限制
+                    # Check group size limit
                     if len(current_group) >= max_group_size:
                         break
             
-            # 只保存包含多张图片的组
+            # Only save groups with multiple images
             if len(current_group) > 1:
                 groups.append(current_group)
-                logger.info(f"检测到同位置组：{len(current_group)}张图片")
+                logger.info(f"Detected same position group: {len(current_group)} images")
         
-        logger.info(f"总共检测到 {len(groups)} 个同位置组")
+        logger.info(f"Total {len(groups)} same position groups detected")
         return groups
     
     def get_position_summary(self, json_path: Path) -> Optional[str]:
-        """获取位置信息摘要
+        """Get position information summary
         
         Args:
-            json_path: JSON文件路径
+            json_path: JSON file path
             
         Returns:
-            位置信息字符串
+            Position information string
         """
         pos = self.read_position_from_json(json_path)
         if pos is None:

@@ -1,6 +1,6 @@
 {
-    "source_root": "/media/gyc/Backup Plus5/gyc/ATB_data/raw_data",
-    "output_root": "/media/gyc/Backup Plus5/gyc/ATB_data/enhanced_output",
+    "source_root": "/media/gyc/Backup Plus6/gyc/ATB_data/demo_test_data",
+    "output_root": "/media/gyc/Backup Plus6/gyc/ATB_data/enhanced_output_demo_test_data",
     "file_operation": "copy",
     "classifier_params": {
       "laplacian_threshold": 250,

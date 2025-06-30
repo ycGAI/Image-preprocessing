@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class EnhancedBatchProcessor:
-    """增强的批量图像处理器
+    """Enhanced batch image processor
     
-    支持清晰度、曝光、位置和工作区域检测
+    Supports sharpness, exposure, position and work area detection
     """
     
     def __init__(self,
@@ -27,24 +27,24 @@ class EnhancedBatchProcessor:
                  work_area_params: Optional[Dict] = None,
                  file_operation: FileOperationType = 'copy',
                  max_workers: int = 4):
-        """初始化批量处理器
+        """Initialize batch processor
         
         Args:
-            source_root: 源文件夹根目录
-            output_root: 输出文件夹根目录
-            classifier_params: 清晰度分类器参数
-            exposure_params: 曝光分析器参数
-            position_params: 位置检测器参数
-            work_area_params: 工作区域检测器参数
-            file_operation: 文件操作类型
-            max_workers: 最大线程数
+            source_root: Source folder root directory
+            output_root: Output folder root directory
+            classifier_params: Sharpness classifier parameters
+            exposure_params: Exposure analyzer parameters
+            position_params: Position detector parameters
+            work_area_params: Work area detector parameters
+            file_operation: File operation type
+            max_workers: Maximum number of threads
         """
         self.source_root = Path(source_root)
         self.output_root = Path(output_root)
         self.max_workers = max_workers
         self.file_operation = file_operation
         
-        # 创建处理器
+        # Create processor
         self.processor = EnhancedImageProcessor(
             classifier_params=classifier_params,
             exposure_params=exposure_params,
@@ -53,7 +53,7 @@ class EnhancedBatchProcessor:
             file_operation=file_operation
         )
         
-        # 处理结果
+        # Processing results
         self.results = {
             'processed_folders': [],
             'total_images': 0,
@@ -65,7 +65,7 @@ class EnhancedBatchProcessor:
         }
         
     def find_time_folders(self) -> List[Path]:
-        """查找时间格式的文件夹"""
+        """Find folders in time format"""
         time_folders = []
         
         for folder in self.source_root.iterdir():
@@ -75,25 +75,25 @@ class EnhancedBatchProcessor:
         return sorted(time_folders)
         
     def process_folder_wrapper(self, source_folder: Path) -> Dict:
-        """文件夹处理包装器（用于多线程）
+        """Folder processing wrapper (for multithreading)
         
         Args:
-            source_folder: 源文件夹
+            source_folder: Source folder
             
         Returns:
-            处理结果
+            Processing results
         """
         try:
-            # 创建输出文件夹
+            # Create output folder
             output_folder = self.output_root / source_folder.name
             
-            # 处理文件夹
+            # Process folder
             result = self.processor.process_folder(source_folder, output_folder)
             
             return result
             
         except Exception as e:
-            error_msg = f"处理文件夹 {source_folder.name} 时出错: {str(e)}"
+            error_msg = f"Error processing folder {source_folder.name}: {str(e)}"
             logger.error(error_msg)
             return {
                 'folder': source_folder.name,
@@ -104,36 +104,36 @@ class EnhancedBatchProcessor:
             }
             
     def run(self) -> Dict:
-        """运行批量处理
+        """Run batch processing
         
         Returns:
-            处理结果
+            Processing results
         """
         start_time = time.time()
-        logger.info("开始增强批量图像处理...")
+        logger.info("Starting enhanced batch image processing...")
         
-        # 查找时间文件夹
+        # Find time folders
         time_folders = self.find_time_folders()
         
         if not time_folders:
-            logger.error("没有找到时间格式的文件夹")
+            logger.error("No time-formatted folders found")
             return self.results
             
-        logger.info(f"找到 {len(time_folders)} 个时间文件夹")
+        logger.info(f"Found {len(time_folders)} time folders")
         
-        # 创建输出根目录
+        # Create output root directory
         self.processor.file_utils.create_directory(self.output_root)
         
-        # 多线程处理文件夹
+        # Multi-threaded folder processing
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # 提交任务
+            # Submit tasks
             future_to_folder = {
                 executor.submit(self.process_folder_wrapper, folder): folder
                 for folder in time_folders
             }
             
-            # 收集结果
-            with tqdm(total=len(time_folders), desc="处理文件夹") as pbar:
+            # Collect results
+            with tqdm(total=len(time_folders), desc="Processing folders") as pbar:
                 for future in as_completed(future_to_folder):
                     folder = future_to_folder[future]
                     
@@ -141,42 +141,42 @@ class EnhancedBatchProcessor:
                         result = future.result()
                         self.results['processed_folders'].append(result)
                         
-                        # 更新总计数
+                        # Update total counts
                         self.results['total_images'] += result.get('total_images', 0)
                         self.results['clean_images'] += result.get('clean_images', 0)
                         self.results['dirty_images'] += result.get('dirty_images', 0)
                         self.results['same_position_groups'] += result.get('same_position_groups', 0)
                         
-                        # 更新dirty原因统计
+                        # Update dirty reason statistics
                         for reason, count in result.get('dirty_reasons_count', {}).items():
                             self.results['dirty_reasons_summary'][reason] = \
                                 self.results['dirty_reasons_summary'].get(reason, 0) + count
                                 
-                        # 检查错误
+                        # Check for errors
                         if 'error' in result:
                             self.results['errors'].append(f"{folder.name}: {result['error']}")
                             
                     except Exception as e:
-                        error_msg = f"收集结果时出错 {folder.name}: {str(e)}"
+                        error_msg = f"Error collecting results {folder.name}: {str(e)}"
                         logger.error(error_msg)
                         self.results['errors'].append(error_msg)
                         
                     pbar.update(1)
                     
-        # 计算处理时间
+        # Calculate processing time
         self.results['processing_time'] = time.time() - start_time
         
-        # 生成报告
+        # Generate report
         self.generate_report()
         
-        logger.info("增强批量处理完成！")
+        logger.info("Enhanced batch processing complete!")
         return self.results
         
     def generate_report(self):
-        """生成处理报告"""
+        """Generate processing report"""
         report_generator = EnhancedReportGenerator(self.output_root)
         
-        # 收集所有设置
+        # Collect all settings
         settings = {
             'file_operation': self.file_operation,
             'sharpness_thresholds': self.processor.sharpness_classifier.get_thresholds(),
@@ -193,29 +193,85 @@ class EnhancedBatchProcessor:
             }
         }
         
-        # 生成报告
+        # Generate report
         report = report_generator.generate_processing_report(
             self.results, 
             self.results.get('processing_time', 0),
             settings
         )
         
-        # 打印摘要
+        # Print summary
         report_generator.print_summary(report)
         
-        # 生成可视化报告
+        # Generate visual report
         try:
             report_generator.generate_visual_report(self.results, save_plots=True)
-            logger.info("可视化报告生成成功")
+            logger.info("Visual report generated successfully")
         except Exception as e:
-            logger.warning(f"生成可视化报告时出错: {e}")
+            logger.warning(f"Error generating visual report: {e}")
             
-        # 导出CSV
+        # Export CSV
         try:
             csv_path = report_generator.export_to_csv(self.results)
             if csv_path:
-                logger.info(f"CSV文件已导出: {csv_path}")
+                logger.info(f"CSV file exported: {csv_path}")
         except Exception as e:
-            logger.warning(f"导出CSV时出错: {e}")
+            logger.warning(f"Error exporting CSV: {e}")
+            
+    def preview_processing(self, max_folders: int = 3) -> Dict:
+        """Preview processing results
+        
+        Args:
+            max_folders: Maximum number of folders to preview
+            
+        Returns:
+            Preview results
+        """
+        logger.info("Running preview mode...")
+        
+        # Find time folders
+        time_folders = self.find_time_folders()
+        
+        if not time_folders:
+            logger.error("No time-formatted folders found")
+            return {
+                'total_found_folders': 0,
+                'preview_folder_count': 0,
+                'preview_folders': []
+            }
+            
+        # Select folders to preview
+        preview_folders = time_folders[:max_folders]
+        
+        preview_results = {
+            'total_found_folders': len(time_folders),
+            'preview_folder_count': len(preview_folders),
+            'preview_folders': []
+        }
+        
+        for folder in preview_folders:
+            # Find image-JSON pairs
+            pairs = self.processor.file_utils.find_image_json_pairs(folder)
+            
+            folder_info = {
+                'folder_name': folder.name,
+                'folder_path': str(folder),
+                'image_json_pairs': len(pairs)
+            }
+            
+            # Analyze sample images (up to 5)
+            if pairs:
+                sample_pairs = pairs[:5]
+                folder_info['sample_analysis'] = []
+                
+                for img_path, json_path in sample_pairs:
+                    analysis = self.processor.quality_analyzer.analyze_image(img_path)
+                    folder_info['sample_analysis'].append({
+                        'image': img_path.name,
+                        'is_clean': analysis['is_clean'],
+                        'dirty_reasons': analysis.get('dirty_reasons', [])
+                    })
+                    
+            preview_results['preview_folders'].append(folder_info)
             
         return preview_results

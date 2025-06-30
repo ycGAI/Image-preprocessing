@@ -7,161 +7,161 @@ logger = logging.getLogger(__name__)
 
 
 class WorkAreaDetector:
-    """工作区域检测器 - 简化版
+    """Work area detector - Simplified version
     
-    通过颜色判断：
-    - 工作区域：大部分是土地（棕色/暗色），只有少量植物
-    - 非工作区域：大部分是草地（绿色）
+    Determination by color:
+    - Work area: Mostly soil (brown/dark), with minimal plants
+    - Non-work area: Mostly grass (green)
     """
     
     def __init__(self,
-                 grass_threshold: float = 0.5,      # 草地判定阈值（绿色比例>50%认为是草地）
-                 soil_min_threshold: float = 0.3,   # 工作区域最小土壤比例
-                 green_max_threshold: float = 0.3): # 工作区域最大绿色比例
-        """初始化工作区域检测器
+                 grass_threshold: float = 0.5,      # Grass threshold (green ratio > 50% is considered grass)
+                 soil_min_threshold: float = 0.3,   # Minimum soil ratio for work area
+                 green_max_threshold: float = 0.3): # Maximum green ratio for work area
+        """Initialize work area detector
         
         Args:
-            grass_threshold: 绿色比例超过此值判定为草地（非工作区域）
-            soil_min_threshold: 土壤比例超过此值可能是工作区域
-            green_max_threshold: 工作区域的绿色比例不应超过此值
+            grass_threshold: Green ratio exceeding this value is considered grass (non-work area)
+            soil_min_threshold: Soil ratio exceeding this value may be work area
+            green_max_threshold: Green ratio in work area should not exceed this value
         """
         self.grass_threshold = grass_threshold
         self.soil_min_threshold = soil_min_threshold
         self.green_max_threshold = green_max_threshold
     
     def detect_green_grass(self, image: np.ndarray) -> Tuple[float, np.ndarray]:
-        """检测绿色草地区域
+        """Detect green grass areas
         
         Args:
-            image: 输入图像 (BGR格式)
+            image: Input image (BGR format)
             
         Returns:
-            (绿色区域比例, 绿色掩码)
+            (green area ratio, green mask)
         """
-        # 转换到HSV空间
+        # Convert to HSV space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # 定义草地绿色范围（比较宽泛）
-        # 草地的绿色通常比较鲜艳
-        lower_green = np.array([25, 30, 30])    # 色相25-85覆盖各种绿色
+        # Define grass green range (relatively broad)
+        # Grass green is usually quite bright
+        lower_green = np.array([25, 30, 30])    # Hue 25-85 covers various greens
         upper_green = np.array([85, 255, 255])
         
-        # 创建绿色掩码
+        # Create green mask
         mask_green = cv2.inRange(hsv, lower_green, upper_green)
         
-        # 形态学操作去噪
+        # Morphological operations for noise removal
         kernel = np.ones((5, 5), np.uint8)
         mask_green = cv2.morphologyEx(mask_green, cv2.MORPH_OPEN, kernel)
         mask_green = cv2.morphologyEx(mask_green, cv2.MORPH_CLOSE, kernel)
         
-        # 计算绿色区域比例
+        # Calculate green area ratio
         green_ratio = np.sum(mask_green > 0) / (image.shape[0] * image.shape[1])
         
         return float(green_ratio), mask_green
     
     def detect_soil(self, image: np.ndarray) -> Tuple[float, np.ndarray]:
-        """检测土壤区域（棕色和暗色区域）
+        """Detect soil areas (brown and dark areas)
         
         Args:
-            image: 输入图像 (BGR格式)
+            image: Input image (BGR format)
             
         Returns:
-            (土壤区域比例, 土壤掩码)
+            (soil area ratio, soil mask)
         """
-        # 转换到HSV空间
+        # Convert to HSV space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # 定义多种土壤颜色范围
+        # Define multiple soil color ranges
         masks = []
         
-        # 1. 棕色土壤（色相10-25）
+        # 1. Brown soil (hue 10-25)
         lower_brown = np.array([10, 20, 20])
         upper_brown = np.array([25, 255, 180])
         mask_brown = cv2.inRange(hsv, lower_brown, upper_brown)
         masks.append(mask_brown)
         
-        # 2. 暗色土壤（低亮度）
+        # 2. Dark soil (low brightness)
         lower_dark = np.array([0, 0, 0])
-        upper_dark = np.array([180, 255, 80])  # 亮度<80
+        upper_dark = np.array([180, 255, 80])  # Brightness < 80
         mask_dark = cv2.inRange(hsv, lower_dark, upper_dark)
         masks.append(mask_dark)
         
-        # 3. 灰色土壤（低饱和度）
+        # 3. Gray soil (low saturation)
         lower_gray = np.array([0, 0, 40])
-        upper_gray = np.array([180, 30, 120])  # 饱和度<30
+        upper_gray = np.array([180, 30, 120])  # Saturation < 30
         mask_gray = cv2.inRange(hsv, lower_gray, upper_gray)
         masks.append(mask_gray)
         
-        # 合并所有土壤掩码
+        # Merge all soil masks
         mask_soil = masks[0]
         for mask in masks[1:]:
             mask_soil = cv2.bitwise_or(mask_soil, mask)
         
-        # 去除与绿色重叠的部分
+        # Remove overlapping green parts
         _, mask_green = self.detect_green_grass(image)
         mask_soil = cv2.bitwise_and(mask_soil, cv2.bitwise_not(mask_green))
         
-        # 形态学操作
+        # Morphological operations
         kernel = np.ones((5, 5), np.uint8)
         mask_soil = cv2.morphologyEx(mask_soil, cv2.MORPH_OPEN, kernel)
         mask_soil = cv2.morphologyEx(mask_soil, cv2.MORPH_CLOSE, kernel)
         
-        # 计算土壤区域比例
+        # Calculate soil area ratio
         soil_ratio = np.sum(mask_soil > 0) / (image.shape[0] * image.shape[1])
         
         return float(soil_ratio), mask_soil
     
     def is_in_work_area(self, image: np.ndarray) -> Tuple[bool, Dict[str, float]]:
-        """判断图像是否在工作区域内
+        """Determine if image is in work area
         
-        判断逻辑：
-        1. 如果绿色比例>50%，判定为草地（非工作区域）
-        2. 如果土壤比例>30%且绿色比例<30%，判定为工作区域
-        3. 其他情况根据绿色和土壤的比例综合判断
+        Determination logic:
+        1. If green ratio > 50%, considered grass (non-work area)
+        2. If soil ratio > 30% and green ratio < 30%, considered work area
+        3. Other cases determined by green and soil ratio combination
         
         Args:
-            image: 输入图像
+            image: Input image
             
         Returns:
-            (是否在工作区域, 检测指标)
+            (is in work area, detection metrics)
         """
-        # 检测绿色草地
+        # Detect green grass
         green_ratio, green_mask = self.detect_green_grass(image)
         
-        # 检测土壤
+        # Detect soil
         soil_ratio, soil_mask = self.detect_soil(image)
         
-        # 计算其他区域（可能是天空、道路等）
+        # Calculate other areas (may be sky, road, etc.)
         other_ratio = 1.0 - green_ratio - soil_ratio
         
-        # 构建指标
+        # Build metrics
         metrics = {
             'green_ratio': green_ratio,
             'soil_ratio': soil_ratio,
             'other_ratio': float(other_ratio),
-            'green_soil_ratio': green_ratio / (soil_ratio + 0.001)  # 避免除零
+            'green_soil_ratio': green_ratio / (soil_ratio + 0.001)  # Avoid division by zero
         }
         
-        # 判断逻辑
+        # Determination logic
         in_work_area = True
         reasons = []
         
-        # 规则1：绿色太多，判定为草地
+        # Rule 1: Too much green, considered grass
         if green_ratio > self.grass_threshold:
             in_work_area = False
             reasons.append(f"too_much_green ({green_ratio:.1%})")
         
-        # 规则2：土壤充足且绿色较少，判定为工作区域
+        # Rule 2: Sufficient soil and little green, considered work area
         elif soil_ratio > self.soil_min_threshold and green_ratio < self.green_max_threshold:
             in_work_area = True
-            # 这是典型的工作区域
+            # This is typical work area
         
-        # 规则3：土壤太少
+        # Rule 3: Too little soil
         elif soil_ratio < 0.1:
             in_work_area = False
             reasons.append(f"insufficient_soil ({soil_ratio:.1%})")
         
-        # 规则4：绿色和土壤都很少，可能是其他区域（天空、建筑等）
+        # Rule 4: Both green and soil are minimal, may be other areas (sky, buildings, etc.)
         elif green_ratio < 0.1 and soil_ratio < 0.2:
             in_work_area = False
             reasons.append("not_farmland")
@@ -172,42 +172,42 @@ class WorkAreaDetector:
         return in_work_area, metrics
     
     def visualize_detection(self, image: np.ndarray) -> np.ndarray:
-        """可视化检测结果
+        """Visualize detection results
         
         Args:
-            image: 输入图像
+            image: Input image
             
         Returns:
-            可视化结果图像
+            Visualized result image
         """
-        # 检测各个区域
+        # Detect each area
         green_ratio, green_mask = self.detect_green_grass(image)
         soil_ratio, soil_mask = self.detect_soil(image)
         
-        # 创建彩色掩码
+        # Create color mask
         result = image.copy()
         overlay = np.zeros_like(image)
         
-        # 绿色区域标记为亮绿色
+        # Mark green areas as bright green
         overlay[green_mask > 0] = [0, 255, 0]
         
-        # 土壤区域标记为棕色
-        overlay[soil_mask > 0] = [42, 42, 165]  # BGR格式的棕色
+        # Mark soil areas as brown
+        overlay[soil_mask > 0] = [42, 42, 165]  # Brown in BGR format
         
-        # 混合原图和掩码
+        # Blend original image and mask
         alpha = 0.3
         result = cv2.addWeighted(result, 1-alpha, overlay, alpha, 0)
         
-        # 添加文字信息
+        # Add text information
         in_area, metrics = self.is_in_work_area(image)
         status_text = "Work Area" if in_area else "Non-Work Area"
         color = (0, 255, 0) if in_area else (0, 0, 255)
         
-        # 背景框
+        # Background box
         cv2.rectangle(result, (5, 5), (300, 110), (0, 0, 0), -1)
         cv2.rectangle(result, (5, 5), (300, 110), color, 2)
         
-        # 文字信息
+        # Text information
         cv2.putText(result, status_text, (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
         cv2.putText(result, f"Green: {green_ratio:.1%}", (10, 55),
@@ -220,27 +220,27 @@ class WorkAreaDetector:
         return result
     
     def get_color_statistics(self, image: np.ndarray) -> Dict[str, float]:
-        """获取详细的颜色统计信息
+        """Get detailed color statistics
         
         Args:
-            image: 输入图像
+            image: Input image
             
         Returns:
-            颜色统计信息
+            Color statistics
         """
         in_area, metrics = self.is_in_work_area(image)
         
-        # 添加更多统计信息
+        # Add more statistical information
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # 平均色相、饱和度、亮度
+        # Average hue, saturation, value
         metrics['mean_hue'] = float(np.mean(hsv[:, :, 0]))
         metrics['mean_saturation'] = float(np.mean(hsv[:, :, 1]))
         metrics['mean_value'] = float(np.mean(hsv[:, :, 2]))
         
-        # 主色调分析
+        # Dominant hue analysis
         hue_hist, _ = np.histogram(hsv[:, :, 0], bins=18, range=(0, 180))
         dominant_hue_bin = np.argmax(hue_hist)
-        metrics['dominant_hue'] = float(dominant_hue_bin * 10)  # 转换为角度
+        metrics['dominant_hue'] = float(dominant_hue_bin * 10)  # Convert to degrees
         
         return metrics

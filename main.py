@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-增强的图像质量分类主程序
+Enhanced Image Quality Classification Main Program
 
-新增功能:
-- 曝光检测（过曝/欠曝）
-- 同位置拍摄检测
-- 工作区域检测（植物和土壤）
-- 支持文件操作模式（复制/移动/软链接）
+New features:
+- Exposure detection (overexposure/underexposure)
+- Same position shot detection
+- Work area detection (plants and soil)
+- Supports file operation modes (copy/move/symlink)
 
-使用方法:
+Usage:
     python enhanced_main.py --source /path/to/source --output /path/to/output
     python enhanced_main.py --config enhanced_config.json
     python enhanced_main.py --preview --source /path/to/source
@@ -25,7 +25,7 @@ from enhanced_batch_processor import EnhancedBatchProcessor
 from enhanced_file_utils import FileOperationType
 
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
-    """设置日志配置"""
+    """Setup logging configuration"""
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     
     handlers = [logging.StreamHandler(sys.stdout)]
@@ -40,18 +40,18 @@ def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
 
 
 def load_config(config_path: str) -> Dict:
-    """加载配置文件"""
+    """Load configuration file"""
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         return config
     except Exception as e:
-        logging.error(f"加载配置文件失败: {e}")
+        logging.error(f"Failed to load config file: {e}")
         return {}
 
 
 def create_default_config() -> Dict:
-    """创建默认配置"""
+    """Create default configuration"""
     return {
         "source_root": "./input",
         "output_root": "./output",
@@ -74,9 +74,9 @@ def create_default_config() -> Dict:
             "rotation_threshold": 0.1
         },
         "work_area_params": {
-            "grass_threshold": 0.5,          # 修改：草地判定阈值
-            "soil_min_threshold": 0.3,      # 修改：最小土壤比例
-            "green_max_threshold": 0.3       # 修改：工作区域最大绿色比例
+            "grass_threshold": 0.5,          # Modified: Grass detection threshold
+            "soil_min_threshold": 0.3,      # Modified: Minimum soil ratio
+            "green_max_threshold": 0.3       # Modified: Maximum green ratio for work area
         },
         "processing": {
             "max_workers": 4
@@ -89,30 +89,30 @@ def create_default_config() -> Dict:
 
 
 def save_config_template(output_path: str):
-    """保存配置文件模板"""
+    """Save configuration file template"""
     config = create_default_config()
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-        print(f"增强配置文件模板已保存到: {output_path}")
+        print(f"Enhanced config file template saved to: {output_path}")
     except Exception as e:
-        print(f"保存配置文件模板失败: {e}")
+        print(f"Failed to save config file template: {e}")
 
 
 def main():
-    """主函数"""
+    """Main function"""
     parser = argparse.ArgumentParser(
-        description="增强的图像质量分类工具",
+        description="Enhanced Image Quality Classification Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-功能说明:
-  - 检测模糊图像
-  - 检测过曝和欠曝光图像
-  - 检测同一位置连续拍摄的图像
-  - 检测离开工作区域的图像（非植物/土壤）
-  - 支持文件复制、移动或软链接
+Feature description:
+  - Detect blurry images
+  - Detect overexposed and underexposed images
+  - Detect images taken consecutively at the same position
+  - Detect images outside work area (non-plant/soil)
+  - Support file copy, move or symlink
 
-使用示例:
+Usage examples:
   python enhanced_main.py --source ./images --output ./results
   python enhanced_main.py --config enhanced_config.json --file-operation move
   python enhanced_main.py --preview --source ./images --max-folders 3
@@ -120,56 +120,56 @@ def main():
         """
     )
     
-    # 基础参数
-    parser.add_argument('--source', '-s', type=str, help='源文件夹路径')
-    parser.add_argument('--output', '-o', type=str, help='输出文件夹路径')
-    parser.add_argument('--config', '-c', type=str, help='配置文件路径')
+    # Basic parameters
+    parser.add_argument('--source', '-s', type=str, help='Source folder path')
+    parser.add_argument('--output', '-o', type=str, help='Output folder path')
+    parser.add_argument('--config', '-c', type=str, help='Configuration file path')
     
-    # 文件操作参数
+    # File operation parameters
     parser.add_argument('--file-operation', choices=['copy', 'move', 'symlink'],
-                       default='copy', help='文件操作类型')
+                       default='copy', help='File operation type')
     
-    # 预览和模板参数
-    parser.add_argument('--preview', action='store_true', help='预览模式（只分析不处理）')
-    parser.add_argument('--max-folders', type=int, default=3, help='预览模式下最大文件夹数')
-    parser.add_argument('--create-config', type=str, help='创建配置文件模板')
+    # Preview and template parameters
+    parser.add_argument('--preview', action='store_true', help='Preview mode (analyze only, no processing)')
+    parser.add_argument('--max-folders', type=int, default=3, help='Maximum folders in preview mode')
+    parser.add_argument('--create-config', type=str, help='Create configuration file template')
     
-    # 处理参数
-    parser.add_argument('--max-workers', type=int, help='最大线程数')
+    # Processing parameters
+    parser.add_argument('--max-workers', type=int, help='Maximum number of threads')
     
-    # 日志参数
+    # Logging parameters
     parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                       default='INFO', help='日志级别')
-    parser.add_argument('--log-file', type=str, help='日志文件路径')
+                       default='INFO', help='Logging level')
+    parser.add_argument('--log-file', type=str, help='Log file path')
     
-    # 阈值调整参数（可选）
-    parser.add_argument('--sharpness-threshold', type=float, help='清晰度阈值')
-    parser.add_argument('--overexposure-threshold', type=float, help='过曝阈值')
-    parser.add_argument('--underexposure-threshold', type=float, help='欠曝阈值')
-    parser.add_argument('--gps-distance-threshold', type=float, help='GPS距离阈值（米）')
-    parser.add_argument('--rotation-threshold', type=float, help='旋转差异阈值')
-    parser.add_argument('--grass-threshold', type=float, help='草地判定阈值（0-1）')
-    parser.add_argument('--soil-threshold', type=float, help='土壤最小比例阈值（0-1）')
-    parser.add_argument('--work-area-green-max', type=float, help='工作区域最大绿色比例（0-1）')
+    # Threshold adjustment parameters (optional)
+    parser.add_argument('--sharpness-threshold', type=float, help='Sharpness threshold')
+    parser.add_argument('--overexposure-threshold', type=float, help='Overexposure threshold')
+    parser.add_argument('--underexposure-threshold', type=float, help='Underexposure threshold')
+    parser.add_argument('--gps-distance-threshold', type=float, help='GPS distance threshold (meters)')
+    parser.add_argument('--rotation-threshold', type=float, help='Rotation difference threshold')
+    parser.add_argument('--grass-threshold', type=float, help='Grass detection threshold (0-1)')
+    parser.add_argument('--soil-threshold', type=float, help='Minimum soil ratio threshold (0-1)')
+    parser.add_argument('--work-area-green-max', type=float, help='Maximum green ratio for work area (0-1)')
 
     
     args = parser.parse_args()
     
-    # 创建配置文件模板
+    # Create configuration file template
     if args.create_config:
         save_config_template(args.create_config)
         return 0
     
-    # 加载配置
+    # Load configuration
     if args.config:
         config = load_config(args.config)
         if not config:
-            print("配置文件加载失败，使用默认配置")
+            print("Failed to load config file, using default config")
             config = create_default_config()
     else:
         config = create_default_config()
     
-    # 命令行参数覆盖配置文件
+    # Command line parameters override config file
     if args.source:
         config['source_root'] = args.source
     if args.output:
@@ -181,7 +181,7 @@ def main():
     if args.log_file:
         config['logging']['file'] = args.log_file
         
-    # 阈值参数覆盖
+    # Threshold parameter overrides
     if args.sharpness_threshold:
         config['classifier_params']['laplacian_threshold'] = args.sharpness_threshold
     if args.overexposure_threshold:
@@ -201,26 +201,26 @@ def main():
     
     config['logging']['level'] = args.log_level
     
-    # 设置日志
+    # Setup logging
     setup_logging(config['logging']['level'], config['logging'].get('file'))
     logger = logging.getLogger(__name__)
     
-    # 验证必要参数
+    # Validate required parameters
     if not config.get('source_root'):
-        logger.error("请指定源文件夹路径 (--source 或在配置文件中设置)")
+        logger.error("Please specify source folder path (--source or set in config file)")
         return 1
     
     if not config.get('output_root'):
-        logger.error("请指定输出文件夹路径 (--output 或在配置文件中设置)")
+        logger.error("Please specify output folder path (--output or set in config file)")
         return 1
     
-    # 检查源文件夹是否存在
+    # Check if source folder exists
     source_path = Path(config['source_root'])
     if not source_path.exists():
-        logger.error(f"源文件夹不存在: {source_path}")
+        logger.error(f"Source folder does not exist: {source_path}")
         return 1
     
-    # 创建批量处理器
+    # Create batch processor
     processor = EnhancedBatchProcessor(
         source_root=config['source_root'],
         output_root=config['output_root'],
@@ -232,79 +232,79 @@ def main():
         max_workers=config['processing']['max_workers']
     )
     
-    # 预览模式
+    # Preview mode
     if args.preview:
-        logger.info("运行预览模式...")
+        logger.info("Running preview mode...")
         preview_results = processor.preview_processing(args.max_folders)
         
         print("\n" + "="*60)
-        print("预览结果")
+        print("Preview Results")
         print("="*60)
-        print(f"总共找到文件夹数: {preview_results['total_found_folders']}")
-        print(f"预览文件夹数: {preview_results['preview_folder_count']}")
+        print(f"Total folders found: {preview_results['total_found_folders']}")
+        print(f"Preview folder count: {preview_results['preview_folder_count']}")
         print("-" * 60)
         
         for folder_info in preview_results['preview_folders']:
-            print(f"\n文件夹: {folder_info['folder_name']}")
-            print(f"  图像-JSON对数: {folder_info['image_json_pairs']}")
-            print(f"  路径: {folder_info['folder_path']}")
+            print(f"\nFolder: {folder_info['folder_name']}")
+            print(f"  Image-JSON pairs: {folder_info['image_json_pairs']}")
+            print(f"  Path: {folder_info['folder_path']}")
             
             if 'sample_analysis' in folder_info:
-                print("  样本分析:")
+                print("  Sample analysis:")
                 for sample in folder_info['sample_analysis']:
-                    status = "干净" if sample['is_clean'] else f"脏数据 ({', '.join(sample['dirty_reasons'])})"
+                    status = "clean" if sample['is_clean'] else f"dirty ({', '.join(sample['dirty_reasons'])})"
                     print(f"    - {sample['image']}: {status}")
         
         print("\n" + "="*60)
         return 0
     
-    # 正式处理
-    logger.info("开始增强批量处理...")
-    logger.info(f"文件操作模式: {config['file_operation']}")
+    # Formal processing
+    logger.info("Starting enhanced batch processing...")
+    logger.info(f"File operation mode: {config['file_operation']}")
     
     try:
         results = processor.run()
         
-        logger.info("增强批量处理完成！")
+        logger.info("Enhanced batch processing complete!")
         return 0
         
     except KeyboardInterrupt:
-        logger.info("用户中断处理")
+        logger.info("User interrupted processing")
         return 1
     except Exception as e:
-        logger.error(f"处理过程中出现错误: {e}", exc_info=True)
+        logger.error(f"Error during processing: {e}", exc_info=True)
         return 1
 
 
 def run_interactive_mode():
-    """交互式运行模式"""
+    """Interactive running mode"""
     print("="*60)
-    print("增强图像质量分类工具 - 交互模式")
+    print("Enhanced Image Quality Classification Tool - Interactive Mode")
     print("="*60)
     
-    # 获取用户输入
-    source_root = input("请输入源文件夹路径: ").strip()
+    # Get user input
+    source_root = input("Please enter source folder path: ").strip()
     if not source_root:
-        print("源文件夹路径不能为空")
+        print("Source folder path cannot be empty")
         return 1
     
-    output_root = input("请输入输出文件夹路径: ").strip()
+    output_root = input("Please enter output folder path: ").strip()
     if not output_root:
-        print("输出文件夹路径不能为空")  
+        print("Output folder path cannot be empty")  
         return 1
     
-    # 文件操作类型
-    print("\n文件操作类型:")
-    print("1. 复制 (copy) - 默认")
-    print("2. 移动 (move)")
-    print("3. 软链接 (symlink)")
-    operation_choice = input("请选择 (1-3, 默认1): ").strip()
+    # File operation type
+    print("\nFile operation type:")
+    print("1. Copy - default")
+    print("2. Move")
+    print("3. Symlink")
+    operation_choice = input("Please select (1-3, default 1): ").strip()
     
     operation_map = {'1': 'copy', '2': 'move', '3': 'symlink', '': 'copy'}
     file_operation = operation_map.get(operation_choice, 'copy')
     
-    # 询问是否使用默认设置
-    use_default = input("\n是否使用默认检测参数? (y/n, 默认y): ").strip().lower()
+    # Ask whether to use default settings
+    use_default = input("\nUse default detection parameters? (y/n, default y): ").strip().lower()
     
     config = create_default_config()
     config['source_root'] = source_root
@@ -312,61 +312,61 @@ def run_interactive_mode():
     config['file_operation'] = file_operation
     
     if use_default not in ['y', 'yes', '']:
-        # 自定义设置
-        print("\n自定义检测参数 (直接回车使用默认值):")
+        # Custom settings
+        print("\nCustom detection parameters (press Enter for default):")
         
         try:
-            # 清晰度阈值
-            sharp_threshold = input(f"清晰度阈值 (默认{config['classifier_params']['laplacian_threshold']}): ").strip()
+            # Sharpness threshold
+            sharp_threshold = input(f"Sharpness threshold (default {config['classifier_params']['laplacian_threshold']}): ").strip()
             if sharp_threshold:
                 config['classifier_params']['laplacian_threshold'] = float(sharp_threshold)
             
-            # 曝光阈值
-            over_threshold = input(f"过曝阈值 (默认{config['exposure_params']['overexposure_threshold']}): ").strip()
+            # Exposure thresholds
+            over_threshold = input(f"Overexposure threshold (default {config['exposure_params']['overexposure_threshold']}): ").strip()
             if over_threshold:
                 config['exposure_params']['overexposure_threshold'] = float(over_threshold)
                 
-            under_threshold = input(f"欠曝阈值 (默认{config['exposure_params']['underexposure_threshold']}): ").strip()
+            under_threshold = input(f"Underexposure threshold (default {config['exposure_params']['underexposure_threshold']}): ").strip()
             if under_threshold:
                 config['exposure_params']['underexposure_threshold'] = float(under_threshold)
             
-            # 位置检测阈值
-            gps_threshold = input(f"GPS距离阈值，米 (默认{config['position_params']['gps_distance_threshold']}): ").strip()
+            # Position detection thresholds
+            gps_threshold = input(f"GPS distance threshold, meters (default {config['position_params']['gps_distance_threshold']}): ").strip()
             if gps_threshold:
                 config['position_params']['gps_distance_threshold'] = float(gps_threshold)
                 
-            rotation_threshold = input(f"旋转差异阈值 (默认{config['position_params']['rotation_threshold']}): ").strip()
+            rotation_threshold = input(f"Rotation difference threshold (default {config['position_params']['rotation_threshold']}): ").strip()
             if rotation_threshold:
                 config['position_params']['rotation_threshold'] = float(rotation_threshold)
             
-            # 工作区域阈值
-            green_threshold = input(f"植被检测阈值 (默认{config['work_area_params']['green_threshold']}): ").strip()
+            # Work area thresholds
+            green_threshold = input(f"Vegetation detection threshold (default {config['work_area_params']['green_threshold']}): ").strip()
             if green_threshold:
                 config['work_area_params']['green_threshold'] = float(green_threshold)
                 
-            # 线程数
-            max_workers = input(f"最大线程数 (默认{config['processing']['max_workers']}): ").strip()
+            # Thread count
+            max_workers = input(f"Maximum thread count (default {config['processing']['max_workers']}): ").strip()
             if max_workers:
                 config['processing']['max_workers'] = int(max_workers)
                 
         except ValueError as e:
-            print(f"输入值错误: {e}")
+            print(f"Input value error: {e}")
             return 1
     
-    # 设置日志
+    # Setup logging
     setup_logging(config['logging']['level'])
     logger = logging.getLogger(__name__)
     
-    # 检查源文件夹
+    # Check source folder
     source_path = Path(source_root)
     if not source_path.exists():
-        print(f"源文件夹不存在: {source_path}")
+        print(f"Source folder does not exist: {source_path}")
         return 1
     
-    # 询问是否先预览
-    preview = input("\n是否先预览处理结果? (y/n, 默认n): ").strip().lower()
+    # Ask whether to preview first
+    preview = input("\nPreview processing results first? (y/n, default n): ").strip().lower()
     
-    # 创建处理器
+    # Create processor
     processor = EnhancedBatchProcessor(
         source_root=config['source_root'],
         output_root=config['output_root'],
@@ -379,53 +379,53 @@ def run_interactive_mode():
     )
     
     if preview in ['y', 'yes']:
-        print("\n预览处理结果...")
+        print("\nPreviewing processing results...")
         preview_results = processor.preview_processing(3)
         
-        print(f"\n找到 {preview_results['total_found_folders']} 个时间文件夹")
+        print(f"\nFound {preview_results['total_found_folders']} time folders")
         for folder_info in preview_results['preview_folders'][:3]:
-            print(f"\n文件夹: {folder_info['folder_name']}")
-            print(f"  图像对数: {folder_info['image_json_pairs']}")
+            print(f"\nFolder: {folder_info['folder_name']}")
+            print(f"  Image pairs: {folder_info['image_json_pairs']}")
             
             if 'sample_analysis' in folder_info:
-                print("  样本分析:")
+                print("  Sample analysis:")
                 for sample in folder_info['sample_analysis']:
-                    status = "干净" if sample['is_clean'] else f"脏数据"
+                    status = "clean" if sample['is_clean'] else f"dirty"
                     if not sample['is_clean']:
                         reasons = {
-                            'blurry': '模糊',
-                            'overexposed': '过曝',
-                            'underexposed': '欠曝',
-                            'out_of_work_area': '离开工作区域',
-                            'same_position_extra': '同位置重复'
+                            'blurry': 'Blurry',
+                            'overexposed': 'Overexposed',
+                            'underexposed': 'Underexposed',
+                            'out_of_work_area': 'Out of work area',
+                            'same_position_extra': 'Same position duplicate'
                         }
                         reason_list = [reasons.get(r, r) for r in sample['dirty_reasons']]
                         status += f" ({', '.join(reason_list)})"
                     print(f"    - {sample['image']}: {status}")
         
-        continue_process = input("\n是否继续完整处理? (y/n): ").strip().lower()
+        continue_process = input("\nContinue with full processing? (y/n): ").strip().lower()
         if continue_process not in ['y', 'yes']:
-            print("已取消处理")
+            print("Processing cancelled")
             return 0
     
-    # 开始处理
-    print(f"\n开始批量处理 (文件操作: {file_operation})...")
+    # Start processing
+    print(f"\nStarting batch processing (file operation: {file_operation})...")
     try:
         results = processor.run()
         
-        print(f"\n处理完成！结果保存在: {output_root}")
+        print(f"\nProcessing complete! Results saved in: {output_root}")
         return 0
         
     except KeyboardInterrupt:
-        print("\n用户中断处理")
+        print("\nUser interrupted processing")
         return 1
     except Exception as e:
-        print(f"\n处理过程中出现错误: {e}")
+        print(f"\nError during processing: {e}")
         return 1
 
 
 if __name__ == "__main__":
-    # 如果没有命令行参数，进入交互模式
+    # If no command line arguments, enter interactive mode
     if len(sys.argv) == 1:
         exit_code = run_interactive_mode()
     else:
