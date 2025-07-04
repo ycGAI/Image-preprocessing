@@ -3,19 +3,19 @@
     "output_root": "/media/gyc/Backup Plus6/gyc/ATB_data/output",
     "file_operation": "copy",
     "classifier_params": {
-        "laplacian_threshold": 250,
-        "sobel_threshold": 2500,
-        "brenner_threshold": 100817012.06,
-        "tenengrad_threshold": 4063570855.03,
-        "variance_threshold": 50.0
+        "laplacian_threshold": 230,
+        "sobel_threshold": 2200,
+        "brenner_threshold": 95000000.0,
+        "tenengrad_threshold": 3800000000.0,
+        "variance_threshold": 45.0
     },
     "exposure_params": {
-        "overexposure_threshold": 0.13,
-        "underexposure_threshold": 0.10,
-        "bright_pixel_threshold": 240,
-        "dark_pixel_threshold": 10,
+        "overexposure_threshold": 0.26,
+        "underexposure_threshold": 0.12,
+        "bright_pixel_threshold": 245,
+        "dark_pixel_threshold": 8,
         "histogram_bins": 256,
-        "mean_brightness_overexposed": 180,
+        "mean_brightness_overexposed": 210,
         "mean_brightness_underexposed": 20
     },
     "position_params": {
@@ -24,8 +24,8 @@
     },
     "work_area_params": {
         "grass_threshold": 0.6,
-        "soil_min_threshold": 0.25,
-        "green_max_threshold": 0.6
+        "soil_min_threshold": 0.20,
+        "green_max_threshold": 0.65
     },
     "processing": {
         "max_workers": 16,

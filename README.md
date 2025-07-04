@@ -22,3 +22,9 @@ pip install -r requirements.txt
 ```bash
 python main.py --config enhanced_config.json
 ```
+
+**find the sharpness threshold**
+```bash
+python threshold_analyzer.py "/media/gyc/Backup Plus6/gyc/ATB_data/raw_data/20250530" --target-blur-rate 0.05 --validate --visualize
+```
+(It is not particularly accurate and can only be used as a reference value for an approximate range.)

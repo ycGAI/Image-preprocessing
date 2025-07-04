@@ -420,10 +420,10 @@ class FixedWorkingAnalyzer:
             "timestamp": datetime.now().isoformat()
         }
         
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
+        # with open(config_path, 'w', encoding='utf-8') as f:
+        #     json.dump(config, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Optimized config saved to: {config_path}")
+        # logger.info(f"Optimized config saved to: {config_path}")
         
         # Generate detailed report
         report_path = output_path / 'optimization_report.txt'
@@ -598,8 +598,8 @@ def main():
     print("\n" + "="*60)
     print(f"Optimization complete! Total time: {total_time:.1f} seconds")
     print(f"Config file saved to: {args.output_dir / 'optimized_config.json'}")
-    print("\nSuggested command to run main program:")
-    print(f"python main.py --config {args.output_dir / 'optimized_config.json'}")
+    # print("\nSuggested command to run main program:")
+    # print(f"python main.py --config {args.output_dir / 'optimized_config.json'}")
     print("="*60)
     
     return 0
