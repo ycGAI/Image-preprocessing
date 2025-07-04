@@ -1,6 +1,6 @@
 {
-    "source_root": "/media/gyc/Backup Plus6/gyc/ATB_data/demo_test_data",
-    "output_root": "/media/gyc/Backup Plus6/gyc/ATB_data/enhanced_output_demo_test_data",
+    "source_root": "/media/gyc/Backup Plus6/gyc/ATB_data/raw_data",
+    "output_root": "/media/gyc/Backup Plus6/gyc/ATB_data/output",
     "file_operation": "copy",
     "classifier_params": {
         "laplacian_threshold": 250,
@@ -23,9 +23,9 @@
         "rotation_threshold": 0.01
     },
     "work_area_params": {
-        "grass_threshold": 0.5,
-        "soil_min_threshold": 0.2,
-        "green_max_threshold": 0.4
+        "grass_threshold": 0.6,
+        "soil_min_threshold": 0.25,
+        "green_max_threshold": 0.6
     },
     "processing": {
         "max_workers": 16,
